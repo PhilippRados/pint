@@ -1,6 +1,8 @@
 #![allow(unused)]
 
 use clap::Parser;
+// use compress::zlib;
+use inflate::inflate_bytes_zlib;
 use std::str;
 use std::{fs::File, io::Read};
 
@@ -32,10 +34,10 @@ impl Default for PngChunk {
 }
 
 struct IHDRData {
-    width: i64,
-    height: i64,
-    bit_depth: i8,
-    color_type: i8,
+    width: u32,
+    height: u32,
+    bit_depth: u8,
+    color_type: u8,
 }
 
 fn to_hex_string(bytes: Vec<u8>) -> Vec<String> {
@@ -43,18 +45,44 @@ fn to_hex_string(bytes: Vec<u8>) -> Vec<String> {
     strs
 }
 
-fn parse_png_chunks(buf: &[u8]) -> PngChunk {
+fn parse_png_chunks(buf: &[u8]) -> Option<PngChunk> {
     let mut result: PngChunk = PngChunk::default();
+    let chunk_types = ["IHDR", "IDAT", "IEND"];
 
     result.data_len = buf[0..4].iter().fold(0usize, |acc, x| acc + *x as usize);
     result.chunk_len = result.data_len + 12;
     result.chunk_type = match str::from_utf8(&buf[4..8]) {
         Ok(s) => s.to_string(),
-        Err(e) => panic!("Invalid byte sequence in png: {}", e),
+        Err(e) => return None,
     };
+
+    if (!chunk_types.contains(&result.chunk_type.as_str())) {
+        return None;
+    }
+
     result.data = buf[8..8 + result.data_len].to_vec();
     result.crc = buf[8 + result.data_len..8 + result.data_len].to_vec();
+
+    Some(result)
+}
+fn parse_ihdr(data: Vec<u8>) -> IHDRData {
+    let result = IHDRData {
+        width: data[0..4].iter().fold(0, |acc, x| acc + *x as u32),
+        height: data[4..8].iter().fold(0, |acc, x| acc + *x as u32),
+        bit_depth: data[8],
+        color_type: data[9],
+    };
+    assert!(result.color_type == 2, "no rgb encoded png");
+    assert!(
+        result.bit_depth == 8 || result.bit_depth == 16,
+        "rgb encoded images need bit-depth of 8/16"
+    );
     result
+}
+
+fn parse_data(image_data: Vec<Vec<u8>>) {
+    let inflated = inflate_bytes_zlib(&image_data[0] as &[u8]).unwrap();
+    println!("{:?}", inflated);
 }
 
 fn main() {
@@ -72,22 +100,34 @@ fn main() {
     let file_byte_size = File::metadata(file).unwrap().len();
     let buf: &mut [u8] = &mut vec![0; (file_byte_size - 8) as usize]; // cut of beginning identifier sequence
     let result = File::read(file, buf);
-    let mut chunk_len = 1;
-    let meta_data: IHDRData;
-    let data: Vec<Vec<u8>>;
+    let mut i: u32 = 0;
+    let mut meta_data: IHDRData;
+    let mut data: Vec<Vec<u8>> = Vec::new();
 
-    for i in (0..(file_byte_size - 8)).step_by(chunk_len) {
-        println!("{}", i);
-        let chunk = parse_png_chunks(&buf[i as usize..]);
+    assert!(file_byte_size - 8 > 0);
+    while i < (file_byte_size - 8) as u32 {
+        let chunk = match parse_png_chunks(&buf[i as usize..]) {
+            Some(c) => c,
+            None => {
+                i += 1;
+                continue;
+            }
+        };
 
-        // match chunk.chunk_type.as_str() {
-        //     "IHDR" => meta_data = parseIhdrData(chunk),
-        //     "IDAT" => data.push(chunk.data),
-        //     "IEND" => parseData(),
-        // }
-        chunk_len = chunk.chunk_len;
+        match chunk.chunk_type.as_str() {
+            "IHDR" => meta_data = parse_ihdr(chunk.data),
+            "IDAT" => data.push(chunk.data),
+            "IEND" => {
+                parse_data(data);
+                break;
+            }
+            _ => {
+                i += 1;
+                continue;
+            }
+        }
+        i += chunk.chunk_len as u32;
     }
-    println!("{:02X?}", buf);
 }
 
 #[cfg(test)]
@@ -126,11 +166,11 @@ mod tests {
         ];
 
         let result = parse_png_chunks(&buf);
-        assert_eq!(result.chunk_len, 25);
-        assert_eq!(result.data_len, 13);
-        assert_eq!(result.chunk_type, "IHDR");
+        assert_eq!(result.as_ref().unwrap().chunk_len, 25);
+        assert_eq!(result.as_ref().unwrap().data_len, 13);
+        assert_eq!(result.as_ref().unwrap().chunk_type, "IHDR");
         assert_eq!(
-            result.data,
+            result.as_ref().unwrap().data,
             [
                 0b0,
                 0b0,
@@ -147,5 +187,30 @@ mod tests {
                 0b0,
             ]
         );
+    }
+    #[test]
+    fn can_parse_ihdr_data() {
+        // ihdr block
+        let buf = vec![
+            0b0,
+            0b0,
+            0b0,
+            0b10010110,
+            0b0,
+            0b0,
+            0b0,
+            0b10010001,
+            0b0000_1000,
+            0b0000_0010,
+            0b0,
+            0b0,
+            0b0,
+        ];
+
+        let result = parse_ihdr(buf);
+        assert_eq!(result.width, 150);
+        assert_eq!(result.height, 145);
+        assert_eq!(result.bit_depth, 8);
+        assert_eq!(result.color_type, 2);
     }
 }

@@ -102,7 +102,7 @@ function expect_run () {
         mkdir -p "${expected%/*}"
         echo -n "$output" > "$expected" || exit 1
       fi
-      if ! diff "$expected" <(echo -n "$output"); then
+      if ! diff "$expected" <echo -n "$output"; then
         echo 1>&2 "${RED} - FAIL"
         echo 1>&2 "${WHITE}\$ $*"
         echo 1>&2 "Output snapshot did not match snapshot at '$expected'"

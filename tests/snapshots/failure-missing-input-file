@@ -1,0 +1,7 @@
+error: The following required arguments were not provided:
+    <PATH>
+
+USAGE:
+    pint <PATH>
+
+For more information try --help
