@@ -4,3 +4,4 @@ Cargo.lock
 correct_decoded
 incorrect_decoded
 .ipynb_checkpoints/
+plot_rgb.ipynb
