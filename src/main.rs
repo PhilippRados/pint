@@ -140,13 +140,19 @@ fn paeth_filter(current_row: &[u8], line_pos: usize, prev_codel: RGB, prev_row: 
     let p_up_codel = (p - rgb_sum(prev_row[line_pos / 3])).abs();
     let p_diag_codel = (p - rgb_sum(diag_codel)).abs();
 
+    let mut prediction = RGB(0, 0, 0);
     if p_left_codel <= p_up_codel && p_left_codel <= p_diag_codel {
-        return prev_codel;
+        prediction = prev_codel;
     } else if p_up_codel <= p_diag_codel {
-        return prev_row[line_pos / 3];
+        prediction = prev_row[line_pos / 3];
     } else {
-        return diag_codel;
+        prediction = diag_codel;
     }
+    RGB(
+        ((current_row[line_pos] as i16 + prediction.0 as i16) % 256) as u8,
+        ((current_row[line_pos + 1] as i16 + prediction.1 as i16) % 256) as u8,
+        ((current_row[line_pos + 2] as i16 + prediction.2 as i16) % 256) as u8,
+    )
 }
 
 fn add_to_array(current_row: &[u8], prev_row: &[RGB], rgb_img: &mut Vec<RGB>, filter: u8) {
