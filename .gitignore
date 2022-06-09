@@ -5,3 +5,5 @@ correct_decoded
 incorrect_decoded
 .ipynb_checkpoints/
 plot_rgb.ipynb
+changed_paeth
+maybe_correct

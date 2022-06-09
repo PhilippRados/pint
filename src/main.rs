@@ -1,5 +1,4 @@
 #![allow(unused)]
-
 use clap::Parser;
 use inflate::inflate_bytes_zlib;
 use std::str;
@@ -98,55 +97,56 @@ fn parse_ihdr(data: Vec<u8>) -> IHDRData {
 
 fn sub_filter(current_row: &[u8], line_pos: usize, prev_codel: RGB) -> RGB {
     RGB(
-        (current_row[line_pos] as i16 - prev_codel.0 as i16).abs() as u8,
-        (current_row[line_pos + 1] as i16 - prev_codel.1 as i16).abs() as u8,
-        (current_row[line_pos + 2] as i16 - prev_codel.2 as i16).abs() as u8,
+        ((current_row[line_pos] as i16 + prev_codel.0 as i16) % 256) as u8,
+        ((current_row[line_pos + 1] as i16 + prev_codel.1 as i16) % 256) as u8,
+        ((current_row[line_pos + 2] as i16 + prev_codel.2 as i16) % 256) as u8,
     )
 }
 
 fn up_filter(current_row: &[u8], line_pos: usize, prev_row: &[RGB]) -> RGB {
     RGB(
-        (current_row[line_pos] as i16 - prev_row[line_pos / 3].0 as i16).abs() as u8,
-        (current_row[line_pos + 1] as i16 - prev_row[line_pos / 3].1 as i16).abs() as u8,
-        (current_row[line_pos + 2] as i16 - prev_row[line_pos / 3].2 as i16).abs() as u8,
+        ((current_row[line_pos] as i16 + prev_row[line_pos / 3].0 as i16) % 256) as u8,
+        ((current_row[line_pos + 1] as i16 + prev_row[line_pos / 3].1 as i16) % 256) as u8,
+        ((current_row[line_pos + 2] as i16 + prev_row[line_pos / 3].2 as i16) % 256) as u8,
     )
 }
 fn avg_filter(current_row: &[u8], line_pos: usize, prev_codel: RGB, prev_row: &[RGB]) -> RGB {
     RGB(
-        (current_row[line_pos] as i16 - (prev_row[line_pos / 3].0 + prev_codel.0) as i16 / 2).abs()
-            as u8,
-        (current_row[line_pos + 1] as i16 - (prev_row[line_pos / 3].1 + prev_codel.1) as i16 / 2)
-            .abs() as u8,
-        (current_row[line_pos + 2] as i16 - (prev_row[line_pos / 3].2 + prev_codel.2) as i16 / 2)
-            .abs() as u8,
+        ((current_row[line_pos] as i16 + (prev_row[line_pos / 3].0 + prev_codel.0) as i16 / 2)
+            % 256) as u8,
+        ((current_row[line_pos + 1] as i16 + (prev_row[line_pos / 3].1 + prev_codel.1) as i16 / 2)
+            % 256) as u8,
+        ((current_row[line_pos + 2] as i16 + (prev_row[line_pos / 3].2 + prev_codel.2) as i16 / 2)
+            % 256) as u8,
     )
 }
 
+fn rgb_sum(rgb: RGB) -> i16 {
+    (rgb.0 as i32 + rgb.1 as i32 + rgb.2 as i32) as i16
+}
 fn paeth_filter(current_row: &[u8], line_pos: usize, prev_codel: RGB, prev_row: &[RGB]) -> RGB {
-    let diag_codel = if line_pos / 3 > 0 {
+    let diag_codel = if (line_pos / 3) > 0 {
         RGB(
-            prev_row[line_pos / 3 - 1].0,
-            prev_row[line_pos / 3 - 1].1,
-            prev_row[line_pos / 3 - 1].2,
+            prev_row[(line_pos / 3) - 1].0,
+            prev_row[(line_pos / 3) - 1].1,
+            prev_row[(line_pos / 3) - 1].2,
         )
     } else {
         RGB(0, 0, 0)
     };
 
-    RGB(
-        (current_row[line_pos] as i32
-            - (prev_row[line_pos / 3].0 as i32 + prev_codel.0 as i32 + diag_codel.0 as i32) as i32
-                / 3)
-        .abs() as u8,
-        (current_row[line_pos + 1] as i32
-            - (prev_row[line_pos / 3].1 as i32 + prev_codel.1 as i32 + diag_codel.1 as i32) as i32
-                / 3)
-        .abs() as u8,
-        (current_row[line_pos + 2] as i32
-            - (prev_row[line_pos / 3].2 as i32 + prev_codel.2 as i32 + diag_codel.2 as i32) as i32
-                / 3)
-        .abs() as u8,
-    )
+    let p = rgb_sum(prev_codel) + rgb_sum(prev_row[line_pos / 3]) - rgb_sum(diag_codel);
+    let p_left_codel = (p - rgb_sum(prev_codel)).abs();
+    let p_up_codel = (p - rgb_sum(prev_row[line_pos / 3])).abs();
+    let p_diag_codel = (p - rgb_sum(diag_codel)).abs();
+
+    if p_left_codel <= p_up_codel && p_left_codel <= p_diag_codel {
+        return prev_codel;
+    } else if p_up_codel <= p_diag_codel {
+        return prev_row[line_pos / 3];
+    } else {
+        return diag_codel;
+    }
 }
 
 fn add_to_array(current_row: &[u8], prev_row: &[RGB], rgb_img: &mut Vec<RGB>, filter: u8) {
@@ -196,6 +196,7 @@ fn parse_data(image_data: Vec<Vec<u8>>, byte_width: usize) {
     let mut i = 0;
     let pixel_width = byte_width / 3; // bc 3 channels in rgb
     let prev_row: &mut [RGB] = &mut vec![RGB(0, 0, 0); pixel_width];
+    let mut k = 0;
 
     while j + byte_width < inflated.len() {
         let current_row = &inflated[j..j + byte_width + 1]; // + 1 for the line-filter
@@ -204,6 +205,11 @@ fn parse_data(image_data: Vec<Vec<u8>>, byte_width: usize) {
         add_to_array(current_row, prev_row, &mut rgb_img, filter);
 
         prev_row.clone_from_slice(&rgb_img[i..i + pixel_width]);
+        // if k == 5 {
+        //     dbg!(prev_row);
+        //     break;
+        // }
+        // k += 1;
         j += byte_width + 1;
         i += pixel_width;
     }
