@@ -68,10 +68,10 @@ fn parse_png_chunks(buf: &[u8]) -> Option<PngChunk> {
     result.chunk_len = result.data_len + 12;
     result.chunk_type = match str::from_utf8(&buf[4..8]) {
         Ok(s) => s.to_string(),
-        Err(e) => return None,
+        Err(_) => return None,
     };
 
-    if (!chunk_types.contains(&result.chunk_type.as_str())) {
+    if !chunk_types.contains(&result.chunk_type.as_str()) {
         return None;
     }
 
@@ -121,9 +121,6 @@ fn avg_filter(current_row: &[u8], line_pos: usize, prev_codel: RGB, prev_row: &[
     )
 }
 
-fn rgb_sum(rgb: RGB) -> i16 {
-    (rgb.0 as i32 + rgb.1 as i32 + rgb.2 as i32) as i16
-}
 fn paeth_filter(current_row: &[u8], line_pos: usize, prev_codel: RGB, prev_row: &[RGB]) -> RGB {
     let diag_codel = if (line_pos / 3) > 0 {
         RGB(
@@ -135,24 +132,42 @@ fn paeth_filter(current_row: &[u8], line_pos: usize, prev_codel: RGB, prev_row: 
         RGB(0, 0, 0)
     };
 
-    let p = rgb_sum(prev_codel) + rgb_sum(prev_row[line_pos / 3]) - rgb_sum(diag_codel);
-    let p_left_codel = (p - rgb_sum(prev_codel)).abs();
-    let p_up_codel = (p - rgb_sum(prev_row[line_pos / 3])).abs();
-    let p_diag_codel = (p - rgb_sum(diag_codel)).abs();
-
-    let mut prediction = RGB(0, 0, 0);
-    if p_left_codel <= p_up_codel && p_left_codel <= p_diag_codel {
-        prediction = prev_codel;
-    } else if p_up_codel <= p_diag_codel {
-        prediction = prev_row[line_pos / 3];
-    } else {
-        prediction = diag_codel;
-    }
     RGB(
-        ((current_row[line_pos] as i16 + prediction.0 as i16) % 256) as u8,
-        ((current_row[line_pos + 1] as i16 + prediction.1 as i16) % 256) as u8,
-        ((current_row[line_pos + 2] as i16 + prediction.2 as i16) % 256) as u8,
+        paeth_filter_single(
+            current_row[line_pos] as i16,
+            prev_codel.0 as i16,
+            prev_row[line_pos / 3].0 as i16,
+            diag_codel.0 as i16,
+        ),
+        paeth_filter_single(
+            current_row[line_pos + 1] as i16,
+            prev_codel.1 as i16,
+            prev_row[line_pos / 3].1 as i16,
+            diag_codel.1 as i16,
+        ),
+        paeth_filter_single(
+            current_row[line_pos + 2] as i16,
+            prev_codel.2 as i16,
+            prev_row[line_pos / 3].2 as i16,
+            diag_codel.2 as i16,
+        ),
     )
+}
+fn paeth_filter_single(current_pixel: i16, prev_pixel: i16, up_pixel: i16, diag_pixel: i16) -> u8 {
+    let p = prev_pixel + up_pixel - diag_pixel;
+    let p_left_codel = (p - prev_pixel).abs();
+    let p_up_codel = (p - up_pixel).abs();
+    let p_diag_codel = (p - diag_pixel).abs();
+
+    let mut prediction = 0;
+    if p_left_codel <= p_up_codel && p_left_codel <= p_diag_codel {
+        prediction = prev_pixel;
+    } else if p_up_codel <= p_diag_codel {
+        prediction = up_pixel;
+    } else {
+        prediction = diag_pixel;
+    }
+    ((current_pixel as i16 + prediction as i16) % 256) as u8
 }
 
 fn add_to_array(current_row: &[u8], prev_row: &[RGB], rgb_img: &mut Vec<RGB>, filter: u8) {
@@ -192,7 +207,7 @@ fn add_to_array(current_row: &[u8], prev_row: &[RGB], rgb_img: &mut Vec<RGB>, fi
 #[derive(Copy, Clone, Debug)]
 struct RGB(u8, u8, u8);
 
-fn parse_data(image_data: Vec<Vec<u8>>, byte_width: usize) {
+fn parse_data(image_data: Vec<Vec<u8>>, byte_width: usize) -> Vec<RGB> {
     let mut inflated = Vec::new();
     for i in image_data {
         inflated.append(&mut inflate_bytes_zlib(&i as &[u8]).unwrap());
@@ -202,7 +217,6 @@ fn parse_data(image_data: Vec<Vec<u8>>, byte_width: usize) {
     let mut i = 0;
     let pixel_width = byte_width / 3; // bc 3 channels in rgb
     let prev_row: &mut [RGB] = &mut vec![RGB(0, 0, 0); pixel_width];
-    let mut k = 0;
 
     while j + byte_width < inflated.len() {
         let current_row = &inflated[j..j + byte_width + 1]; // + 1 for the line-filter
@@ -211,15 +225,10 @@ fn parse_data(image_data: Vec<Vec<u8>>, byte_width: usize) {
         add_to_array(current_row, prev_row, &mut rgb_img, filter);
 
         prev_row.clone_from_slice(&rgb_img[i..i + pixel_width]);
-        // if k == 5 {
-        //     dbg!(prev_row);
-        //     break;
-        // }
-        // k += 1;
         j += byte_width + 1;
         i += pixel_width;
     }
-    println!("{:?}", rgb_img);
+    return rgb_img;
 }
 
 fn main() {
@@ -255,7 +264,6 @@ fn main() {
         match chunk.chunk_type.as_str() {
             "IHDR" => meta_data = parse_ihdr(chunk.data),
             "IDAT" => {
-                println!("idat");
                 data.push(chunk.data);
             }
             "IEND" => {
@@ -365,5 +373,51 @@ mod tests {
         let buf = vec![0b0, 0b0, 0b0, 0b1001_1011];
         let result = bytes_to_int(&buf[..]);
         assert_eq!(result, 155);
+    }
+    #[test]
+    fn can_parse_idat_to_rgb() {
+        !todo!("write idat parse test");
+        //     let idat = vec![vec![
+        //         120, 218, 237, 221, 81, 110, 234, 48, 16, 64, 209, 166, 98, 95, 241, 210, 237, 149,
+        //         185, 253, 181, 43, 25, 220, 152, 140, 175, 184, 231, 15, 245, 169, 228, 113, 53, 234,
+        //         40, 16, 114, 212, 47, 128, 210, 62, 60, 191, 110, 58, 234, 210, 62, 115, 250, 125, 230,
+        //         253, 124, 71, 31, 128, 174, 50, 33, 158, 9, 241, 76, 136, 247, 136, 122, 226, 163, 78,
+        //         172, 36, 245, 136, 58, 76, 0, 167, 16, 207, 132, 120, 38, 196, 51, 33, 94, 216, 58, 51,
+        //         230, 254, 242, 58, 167, 16, 207, 132, 120, 38, 196, 51, 33, 222, 113, 219, 155, 77,
+        //         227, 211, 49, 123, 238, 47, 91, 30, 84, 207, 41, 196, 51, 33, 158, 9, 241, 76, 136,
+        //         103, 66, 60, 19, 226, 153, 16, 207, 132, 120, 38, 196, 123, 235, 217, 25, 196, 199,
+        //         140, 71, 60, 59, 163, 59, 152, 16, 207, 132, 120, 38, 196, 187, 244, 217, 153, 238,
+        //         175, 125, 157, 253, 185, 86, 112, 10, 241, 76, 136, 103, 66, 60, 19, 226, 205, 173, 51,
+        //         227, 253, 196, 237, 38, 132, 83, 136, 103, 66, 60, 19, 226, 153, 16, 239, 201, 58, 51,
+        //         181, 129, 76, 110, 55, 90, 195, 41, 196, 51, 33, 158, 9, 241, 76, 136, 55, 247, 217,
+        //         153, 110, 67, 201, 185, 121, 152, 82, 243, 112, 114, 127, 217, 113, 221, 241, 179, 51,
+        //         186, 131, 9, 241, 76, 136, 103, 66, 188, 169, 111, 179, 123, 250, 203, 22, 30, 86, 192,
+        //         107, 241, 244, 127, 148, 243, 22, 135, 213, 173, 141, 78, 33, 158, 9, 241, 76, 136,
+        //         103, 66, 188, 149, 235, 12, 226, 92, 198, 74, 119, 45, 59, 41, 149, 193, 79, 157, 66,
+        //         60, 19, 226, 153, 16, 207, 132, 120, 151, 214, 153, 79, 219, 95, 114, 137, 57, 59, 147,
+        //         134, 175, 180, 83, 136, 103, 66, 60, 19, 226, 153, 16, 111, 242, 202, 166, 63, 247,
+        //         130, 212, 13, 114, 234, 30, 55, 91, 149, 83, 136, 103, 66, 60, 19, 226, 153, 16, 111,
+        //         110, 157, 169, 235, 246, 151, 195, 11, 159, 94, 214, 221, 65, 188, 219, 41, 157, 66,
+        //         60, 19, 226, 153, 16, 207, 132, 120, 75, 63, 10, 60, 163, 180, 111, 220, 164, 238, 143,
+        //         244, 153, 162, 94, 145, 129, 168, 55, 155, 198, 156, 66, 60, 19, 226, 153, 16, 207,
+        //         132, 120, 143, 227, 200, 65, 79, 221, 238, 47, 53, 69, 191, 20, 84, 78, 33, 158, 9,
+        //         241, 76, 136, 103, 66, 188, 75, 55, 57, 248, 52, 41, 53, 239, 144, 109, 114, 221, 182,
+        //         83, 136, 103, 66, 60, 19, 226, 153, 16, 111, 155, 117, 102, 120, 149, 84, 237, 190,
+        //         176, 239, 182, 131, 106, 191, 226, 165, 59, 140, 50, 243, 171, 222, 199, 41, 196, 51,
+        //         33, 158, 9, 241, 76, 136, 183, 203, 58, 211, 159, 231, 8, 218, 95, 250, 163, 218, 227,
+        //         48, 198, 156, 66, 60, 19, 226, 153, 16, 207, 132, 120, 38, 196, 51, 33, 158, 9, 241,
+        //         76, 136, 103, 66, 60, 19, 226, 153, 16, 207, 132, 120, 38, 196, 51, 33, 222, 46, 111,
+        //         54, 17, 157, 231, 255, 191, 22, 185, 172, 187, 230, 219, 41, 196, 51, 33, 158, 9, 241,
+        //         76, 136, 231, 58, 19, 163, 187, 141, 228, 21, 78, 33, 158, 9, 241, 76, 136, 103, 66,
+        //         60, 215, 153, 32, 117, 217, 13, 175, 156, 66, 60, 19, 226, 153, 16, 207, 132, 120, 174,
+        //         51, 11, 229, 215, 255, 233, 194, 111, 172, 113, 10, 241, 76, 136, 103, 66, 60, 19, 226,
+        //         133, 173, 51, 53, 183, 247, 127, 74, 209, 175, 4, 150, 83, 136, 103, 66, 60, 19, 226,
+        //         153, 16, 207, 132, 120, 38, 196, 51, 33, 158, 9, 241, 76, 136, 103, 66, 60, 19, 226,
+        //         153, 16, 207, 132, 120, 38, 196, 251, 1, 201, 164, 87, 175,
+        //     ]];
+        //     let byte_width = 451;
+        //     let result = parse_data(idat, 451);
+        // let expected =
+        // assert_eq!(result, expected);
     }
 }
