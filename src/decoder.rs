@@ -46,7 +46,7 @@ fn to_hex_string(bytes: Vec<u8>) -> Vec<String> {
     bytes.iter().map(|b| format!("{:02X}", b)).collect()
 }
 
-pub fn is_valid_png(file: &mut File) {
+pub fn check_valid_png(file: &mut File) {
     const VALID_PNG: &str = "89504E470D0A1A0A";
 
     let first_bytes: &mut Vec<u8> = &mut vec![0; 8];
