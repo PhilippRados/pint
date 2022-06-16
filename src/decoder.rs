@@ -173,31 +173,32 @@ fn paeth_filter_single(current_pixel: i16, prev_pixel: i16, up_pixel: i16, diag_
     ((current_pixel as i16 + prediction as i16) % 256) as u8
 }
 
-fn add_to_array(current_row: &[u8], prev_row: &[RGB], rgb_img: &mut Vec<RGB>, filter: u8) {
+fn add_to_array(current_row: &[u8], prev_row: &[RGB], filter: u8) -> Vec<RGB> {
     let mut line_pos = 1;
     let mut prev_pixel = RGB(0, 0, 0);
+    let mut result: Vec<RGB> = Vec::new();
 
     while line_pos < current_row.len() - 2 {
         match filter {
-            0 => rgb_img.push(RGB(
+            0 => result.push(RGB(
                 current_row[line_pos],
                 current_row[line_pos + 1],
                 current_row[line_pos + 2],
             )),
             1 => {
                 let pixel = sub_filter(current_row, line_pos, prev_pixel);
-                rgb_img.push(pixel);
+                result.push(pixel);
                 prev_pixel = pixel;
             }
-            2 => rgb_img.push(up_filter(current_row, line_pos, prev_row)),
+            2 => result.push(up_filter(current_row, line_pos, prev_row)),
             3 => {
                 let pixel = avg_filter(current_row, line_pos, prev_pixel, prev_row);
-                rgb_img.push(pixel);
+                result.push(pixel);
                 prev_pixel = pixel;
             }
             4 => {
                 let pixel = paeth_filter(current_row, line_pos, prev_pixel, prev_row);
-                rgb_img.push(pixel);
+                result.push(pixel);
                 prev_pixel = pixel;
             }
             _ => println!("this filter doesn't exist"),
@@ -205,17 +206,18 @@ fn add_to_array(current_row: &[u8], prev_row: &[RGB], rgb_img: &mut Vec<RGB>, fi
 
         line_pos += 3;
     }
+    result
 }
 
 #[derive(Copy, Clone, Debug)]
 pub struct RGB(u8, u8, u8);
 
-fn parse_data(image_data: Vec<Vec<u8>>, pixel_width: usize) -> Vec<RGB> {
+fn parse_data(image_data: Vec<Vec<u8>>, pixel_width: usize) -> Vec<Vec<RGB>> {
     let mut inflated = Vec::new();
     for i in image_data {
         inflated.append(&mut inflate_bytes_zlib(&i as &[u8]).unwrap());
     }
-    let mut rgb_img: Vec<RGB> = Vec::new();
+    let mut rgb_img: Vec<Vec<RGB>> = Vec::new();
     let mut j = 0;
     let mut i = 0;
     let byte_width = pixel_width * 3; // bc 3 channels in rgb
@@ -225,23 +227,23 @@ fn parse_data(image_data: Vec<Vec<u8>>, pixel_width: usize) -> Vec<RGB> {
         let current_row = &inflated[j..j + byte_width + 1]; // + 1 for the line-filter
         let filter = current_row[0];
 
-        add_to_array(current_row, prev_row, &mut rgb_img, filter);
+        rgb_img.push(add_to_array(current_row, prev_row, filter));
 
-        prev_row.clone_from_slice(&rgb_img[i..i + pixel_width]);
+        prev_row.clone_from_slice(&rgb_img[i]);
         j += byte_width + 1;
-        i += pixel_width;
+        i += 1;
     }
     return rgb_img;
 }
 
-pub fn decode_png(mut file: File) -> Vec<RGB> {
+pub fn decode_png(mut file: File) -> Vec<Vec<RGB>> {
     let file_byte_size = File::metadata(&mut file).unwrap().len();
     let buf: &mut [u8] = &mut vec![0; (file_byte_size - 8) as usize]; // cut of beginning identifier sequence
     let result = File::read(&mut file, buf);
     let mut i: u32 = 0;
     let mut meta_data: IHDRData = IHDRData::default();
     let mut data: Vec<Vec<u8>> = Vec::new();
-    let mut rgb_img: Vec<RGB> = vec![];
+    let mut rgb_img: Vec<Vec<RGB>> = Vec::new();
 
     assert!(file_byte_size - 8 > 0);
     while i < (file_byte_size - 8) as u32 {

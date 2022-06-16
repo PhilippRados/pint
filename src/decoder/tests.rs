@@ -142,6 +142,7 @@ mod tests {
         // result is too big so its stored in temp-file
         let mut tmp_file = NamedTempFile::new().expect("");
         writeln!(tmp_file, "{:?}", result);
+
         // correct file output is compared to test-file
         let output = Command::new("diff")
             .arg("./tests/fixtures/correct_rgb_idat")
