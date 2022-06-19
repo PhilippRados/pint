@@ -209,7 +209,7 @@ fn add_to_array(current_row: &[u8], prev_row: &[RGB], filter: u8) -> Vec<RGB> {
     result
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct RGB(u8, u8, u8);
 
 fn parse_data(image_data: Vec<Vec<u8>>, pixel_width: usize) -> Vec<Vec<RGB>> {
