@@ -51,9 +51,11 @@ fn remove_all<T: Eq>(arr: &mut Vec<T>, element: &T) {
     arr.retain(|e| e != element);
 }
 
-fn in_range(x_pos: i32, y_pos: i32, rgb_img: &Vec<Vec<RGB>>) -> bool {
+fn in_range(new_pos: &Coordinates, rgb_img: &Vec<Vec<RGB>>) -> bool {
     let width = rgb_img[0].len() as i32;
     let height = rgb_img.len() as i32;
+    let x_pos = new_pos.x;
+    let y_pos = new_pos.y;
 
     if x_pos < width && x_pos >= 0 && y_pos < height && y_pos >= 0 {
         true
@@ -62,8 +64,8 @@ fn in_range(x_pos: i32, y_pos: i32, rgb_img: &Vec<Vec<RGB>>) -> bool {
     }
 }
 
-fn is_color(x_pos: i32, y_pos: i32, rgb_img: &Vec<Vec<RGB>>, color: RGB) -> bool {
-    rgb_img[y_pos as usize][x_pos as usize] == color
+fn is_color(new_pos: &Coordinates, rgb_img: &Vec<Vec<RGB>>, color: RGB) -> bool {
+    rgb_img[new_pos.y as usize][new_pos.x as usize] == color
 }
 
 fn check_adjacent_codels(
@@ -75,14 +77,16 @@ fn check_adjacent_codels(
     color: RGB,
 ) {
     for direction in CORDS {
-        let x_pos = current_pos.x + (direction.x * codel_size);
-        let y_pos = current_pos.y + (direction.y * codel_size);
+        let new_pos = Coordinates {
+            x: current_pos.x + (direction.x * codel_size),
+            y: current_pos.y + (direction.y * codel_size),
+        };
 
-        if in_range(x_pos, y_pos, &rgb_img)
-            && is_color(x_pos, y_pos, &rgb_img, color)
-            && !counted.contains(&Coordinates { x: x_pos, y: y_pos })
+        if in_range(&new_pos, &rgb_img)
+            && is_color(&new_pos, &rgb_img, color)
+            && !counted.contains(&new_pos)
         {
-            not_counted.push(Coordinates { x: x_pos, y: y_pos });
+            not_counted.push(new_pos);
         }
     }
 }
