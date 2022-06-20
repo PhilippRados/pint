@@ -9,3 +9,5 @@ edition = "2018"
 clap = { version = "3.1.18", features = ["derive"] }
 inflate = { version = "0.4.5" }
 tempfile = "3"
+enum_index = "0.2.0"
+enum_index_derive = "0.2.0"
