@@ -154,6 +154,7 @@ fn main() {
 
     // white works as comment
     // black toggles codelchooser if afterwards still black move dp clockwise
+    // git check
 }
 
 #[cfg(test)]
