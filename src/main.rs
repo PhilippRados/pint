@@ -1,4 +1,5 @@
 #![allow(unused)]
+use std::cmp;
 use std::fs::File;
 
 #[macro_use]
@@ -11,6 +12,7 @@ mod decoder;
 
 #[derive(EnumIndex)]
 enum Direction {
+    // maybe as hashmap
     RIGHT,
     DOWN,
     LEFT,
@@ -41,11 +43,34 @@ enum CodelChooser {
     RIGHT,
 }
 
-fn next_pos(coordinates: Coordinates, dp: &Direction, codel_size: i32) -> Coordinates {
-    Coordinates {
-        x: coordinates.x + (codel_size * dp.cords().x),
-        y: coordinates.y + (codel_size * dp.cords().y),
+fn furthest_dp_direction(dp: &Direction, block: &Vec<Coordinates>) -> Vec<Coordinates> {
+    match *dp {
+        Direction::RIGHT => block
+            .iter()
+            .filter(|pos| pos.x == block.iter().max_by_key(|p| p.x).unwrap().x)
+            .cloned()
+            .collect(),
+        Direction::DOWN => block
+            .iter()
+            .filter(|pos| pos.y == block.iter().max_by_key(|p| p.y).unwrap().y)
+            .cloned()
+            .collect(),
+        Direction::LEFT => block
+            .iter()
+            .filter(|pos| pos.x == block.iter().min_by_key(|p| p.x).unwrap().x)
+            .cloned()
+            .collect(),
+        Direction::UP => block
+            .iter()
+            .filter(|pos| pos.y == block.iter().min_by_key(|p| p.y).unwrap().y)
+            .cloned()
+            .collect(),
     }
+}
+
+fn next_pos(dp: &Direction, cc: &CodelChooser, block: &Vec<Coordinates>) -> Coordinates {
+    let block_edge = furthest_dp_direction(dp, block);
+    Coordinates { x: 0, y: 0 }
 }
 fn remove_all<T: Eq>(arr: &mut Vec<T>, element: &T) {
     arr.retain(|e| e != element);
@@ -91,7 +116,7 @@ fn check_adjacent_codels(
     }
 }
 
-fn get_block_size(rgb_img: Vec<Vec<RGB>>, pos: Coordinates, codel_size: i32) -> i32 {
+fn get_block(rgb_img: &Vec<Vec<RGB>>, pos: Coordinates, codel_size: i32) -> Vec<Coordinates> {
     let mut counted: Vec<Coordinates> = Vec::new();
     let mut not_counted: Vec<Coordinates> = Vec::new();
     not_counted.push(Coordinates { ..pos });
@@ -123,7 +148,11 @@ fn get_block_size(rgb_img: Vec<Vec<RGB>>, pos: Coordinates, codel_size: i32) -> 
             break;
         };
     }
-    counted.len() as i32
+    counted
+}
+
+fn get_size(block: &Vec<Coordinates>) -> i32 {
+    block.len() as i32
 }
 
 fn main() {
@@ -146,15 +175,50 @@ fn main() {
     let mut cc = CodelChooser::LEFT;
     let mut pos = Coordinates { x: 0, y: 0 };
     let mut block_size = 0;
+    let mut block: Vec<Coordinates>;
 
-    // let result = get_block_size(rgb_img, pos, codel_size);
-    // loop {
-    //     cor = next_pos(cor, &dp, codel_size);
-    // }
+    const LIGHT: [&str; 3] = ["light", "normal", "dark"];
+    const HUE: [&str; 6] = ["red", "yellow", "green", "cyan", "blue", "magenta"];
+    const COLORS: [[RGB; 6]; 3] = [
+        [
+            RGB(255, 192, 192),
+            RGB(255, 255, 192),
+            RGB(192, 255, 192),
+            RGB(192, 255, 255),
+            RGB(192, 192, 255),
+            RGB(255, 192, 255),
+        ],
+        [
+            RGB(255, 0, 0),
+            RGB(255, 255, 0),
+            RGB(0, 255, 0),
+            RGB(0, 255, 255),
+            RGB(0, 0, 255),
+            RGB(255, 0, 255),
+        ],
+        [
+            RGB(192, 0, 0),
+            RGB(192, 192, 0),
+            RGB(0, 192, 0),
+            RGB(0, 192, 192),
+            RGB(0, 0, 192),
+            RGB(192, 0, 192),
+        ],
+    ];
+
+    loop {
+        block = get_block(&rgb_img, pos, codel_size);
+        block_size = get_size(&block);
+        let prev = pos;
+        pos = next_pos(&dp, &cc, &block);
+        //interprete(prev,pos);
+
+        println!("{:?}", rgb_img[pos.y as usize][pos.x as usize]);
+    }
 
     // white works as comment
     // black toggles codelchooser if afterwards still black move dp clockwise
-    // git check
+    // when full rotation in same color block => exit
 }
 
 #[cfg(test)]
@@ -167,7 +231,9 @@ mod tests {
         decoder::check_valid_png(&mut file);
         let rgb_img = decoder::decode_png(file);
 
-        let result = get_block_size(rgb_img, Coordinates { x: 0, y: 0 }, 5);
+        let block = get_block(&rgb_img, Coordinates { x: 0, y: 0 }, 5);
+        let result = get_size(&block);
+
         assert_eq!(result, 72);
     }
     #[test]
@@ -176,7 +242,8 @@ mod tests {
         decoder::check_valid_png(&mut file);
         let rgb_img = decoder::decode_png(file);
 
-        let result = get_block_size(rgb_img, Coordinates { x: 60, y: 0 }, 5);
+        let block = get_block(&rgb_img, Coordinates { x: 60, y: 0 }, 5);
+        let result = get_size(&block);
         assert_eq!(result, 101);
     }
     #[test]
@@ -192,5 +259,39 @@ mod tests {
 
         remove_all::<Coordinates>(&mut cords, &cord);
         assert_eq!(cords, correct);
+    }
+
+    #[test]
+    fn furthest_dp_direction_right() {
+        let block = vec![
+            Coordinates { x: 0, y: 0 },
+            Coordinates { x: 25, y: 50 },
+            Coordinates { x: 25, y: 60 },
+            Coordinates { x: 25, y: 50 },
+        ];
+        let dp = Direction::RIGHT;
+
+        let result = furthest_dp_direction(&dp, &block);
+        let expected = vec![
+            Coordinates { x: 25, y: 50 },
+            Coordinates { x: 25, y: 60 },
+            Coordinates { x: 25, y: 50 },
+        ];
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn furthest_dp_direction_up() {
+        let block = vec![
+            Coordinates { x: 0, y: 0 },
+            Coordinates { x: 25, y: 0 },
+            Coordinates { x: 25, y: 60 },
+            Coordinates { x: 25, y: 50 },
+        ];
+        let dp = Direction::UP;
+
+        let result = furthest_dp_direction(&dp, &block);
+        let expected = vec![Coordinates { x: 0, y: 0 }, Coordinates { x: 25, y: 0 }];
+        assert_eq!(result, expected);
     }
 }
