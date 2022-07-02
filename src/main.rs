@@ -296,7 +296,7 @@ fn main() {
                     cc = cc.toggle();
                     cc_toggled = true;
                 }
-                pos
+                continue;
             }
         };
     }
@@ -453,7 +453,7 @@ mod tests {
                         cc = cc.toggle();
                         cc_toggled = true;
                     }
-                    pos
+                    continue;
                 }
             };
             result.push(pos);
@@ -463,8 +463,6 @@ mod tests {
             Coordinates { x: 60, y: 0 },
             Coordinates { x: 95, y: 0 },
             Coordinates { x: 100, y: 0 },
-            Coordinates { x: 100, y: 0 },
-            Coordinates { x: 100, y: 0 },
             Coordinates { x: 145, y: 55 },
             Coordinates { x: 140, y: 60 },
             Coordinates { x: 140, y: 65 },
@@ -473,37 +471,17 @@ mod tests {
             Coordinates { x: 125, y: 115 },
             Coordinates { x: 125, y: 120 },
             Coordinates { x: 125, y: 125 },
-            Coordinates { x: 125, y: 125 },
-            Coordinates { x: 125, y: 125 },
             Coordinates { x: 105, y: 140 },
             Coordinates { x: 100, y: 140 },
             Coordinates { x: 45, y: 140 },
             Coordinates { x: 40, y: 140 },
             Coordinates { x: 35, y: 140 },
-            Coordinates { x: 35, y: 140 },
-            Coordinates { x: 35, y: 140 },
-            Coordinates { x: 40, y: 75 },
-            Coordinates { x: 40, y: 75 },
             Coordinates { x: 40, y: 75 },
             Coordinates { x: 45, y: 75 },
             Coordinates { x: 50, y: 75 },
-            Coordinates { x: 50, y: 75 },
-            Coordinates { x: 50, y: 75 },
-            Coordinates { x: 50, y: 75 },
-            Coordinates { x: 50, y: 75 },
             Coordinates { x: 15, y: 65 },
             Coordinates { x: 10, y: 65 },
-            Coordinates { x: 10, y: 65 },
-            Coordinates { x: 10, y: 65 },
             Coordinates { x: 20, y: 45 },
-            Coordinates { x: 20, y: 40 },
-            Coordinates { x: 20, y: 40 },
-            Coordinates { x: 20, y: 40 },
-            Coordinates { x: 20, y: 40 },
-            Coordinates { x: 20, y: 40 },
-            Coordinates { x: 20, y: 40 },
-            Coordinates { x: 20, y: 40 },
-            Coordinates { x: 20, y: 40 },
             Coordinates { x: 20, y: 40 },
         ];
 
