@@ -3,14 +3,11 @@ use std::cmp;
 use std::fs::File;
 
 #[macro_use]
-extern crate enum_index_derive;
-
 use decoder::RGB;
-use enum_index::EnumIndex;
 mod cli_options;
 mod decoder;
 
-#[derive(EnumIndex)]
+#[derive(Copy, Clone)]
 enum Direction {
     // maybe as hashmap
     RIGHT,
@@ -19,16 +16,22 @@ enum Direction {
     UP,
 }
 
-const CORDS: [Coordinates; 4] = [
-    Coordinates { x: 1, y: 0 },  //RIGHT
-    Coordinates { x: 0, y: 1 },  // DOWN
-    Coordinates { x: -1, y: 0 }, // LEFT
-    Coordinates { x: 0, y: -1 }, // UP
-];
-
 impl Direction {
     fn cords(&self) -> Coordinates {
-        CORDS[self.enum_index()]
+        match self {
+            Direction::RIGHT => Coordinates { x: 1, y: 0 }, //RIGHT
+            Direction::DOWN => Coordinates { x: 0, y: 1 },  // DOWN
+            Direction::LEFT => Coordinates { x: -1, y: 0 }, // LEFT
+            Direction::UP => Coordinates { x: 0, y: -1 },   // UP
+        }
+    }
+    fn next(&self) -> Direction {
+        match self {
+            Direction::RIGHT => Direction::DOWN,
+            Direction::DOWN => Direction::LEFT,
+            Direction::LEFT => Direction::UP,
+            Direction::UP => Direction::RIGHT,
+        }
     }
 }
 
@@ -41,6 +44,15 @@ struct Coordinates {
 enum CodelChooser {
     LEFT,
     RIGHT,
+}
+
+impl CodelChooser {
+    fn toggle(&self) -> CodelChooser {
+        match self {
+            CodelChooser::LEFT => CodelChooser::RIGHT,
+            CodelChooser::RIGHT => CodelChooser::LEFT,
+        }
+    }
 }
 
 fn block_dp_corners(dp: &Direction, block: &Vec<Coordinates>) -> (Coordinates, Coordinates) {
@@ -97,9 +109,11 @@ fn next_pos(
     cc: &CodelChooser,
     block: &Vec<Coordinates>,
     codel_size: i32,
-) -> Coordinates {
+    rgb_img: &Vec<Vec<RGB>>,
+) -> Option<Coordinates> {
     let block_corners = block_dp_corners(dp, block);
-    match cc {
+
+    let new_pos = match cc {
         CodelChooser::LEFT => Coordinates {
             x: block_corners.0.x + dp.cords().x * codel_size,
             y: block_corners.0.y + dp.cords().y * codel_size,
@@ -108,6 +122,12 @@ fn next_pos(
             x: block_corners.1.x + dp.cords().x * codel_size,
             y: block_corners.1.y + dp.cords().y * codel_size,
         },
+    };
+
+    if !in_range(&new_pos, rgb_img) || is_color(&new_pos, &rgb_img, RGB(0, 0, 0)) {
+        None
+    } else {
+        Some(new_pos)
     }
 }
 
@@ -140,6 +160,13 @@ fn check_adjacent_codels(
     not_counted: &mut Vec<Coordinates>,
     color: RGB,
 ) {
+    const CORDS: [Coordinates; 4] = [
+        Coordinates { x: 1, y: 0 },  //RIGHT
+        Coordinates { x: 0, y: 1 },  // DOWN
+        Coordinates { x: -1, y: 0 }, // LEFT
+        Coordinates { x: 0, y: -1 }, // UP
+    ];
+
     for direction in CORDS {
         let new_pos = Coordinates {
             x: current_pos.x + (direction.x * codel_size),
@@ -163,7 +190,7 @@ fn get_block(rgb_img: &Vec<Vec<RGB>>, pos: Coordinates, codel_size: i32) -> Vec<
     let mut current_pos = pos;
 
     while not_counted.len() > 0 {
-        while rgb_img[current_pos.y as usize][current_pos.x as usize] == color {
+        while in_range(&current_pos, &rgb_img) && is_color(&current_pos, &rgb_img, color) {
             if not_counted.contains(&current_pos) {
                 // remove from not_counted add to counted
                 remove_all::<Coordinates>(&mut not_counted, &current_pos);
@@ -245,16 +272,34 @@ fn main() {
         ],
     ];
 
+    let mut cc_toggled = false;
+    let mut rotations = 0;
     loop {
         block = get_block(&rgb_img, pos, codel_size);
         block_size = get_size(&block);
         let prev = pos;
-        pos = next_pos(&dp, &cc, &block, codel_size);
-        //interprete(prev,pos);
 
-        // println!("{:?}", rgb_img[pos.y as usize][pos.x as usize]);
+        pos = match next_pos(&dp, &cc, &block, codel_size, &rgb_img) {
+            Some(new_pos) => {
+                cc_toggled = false;
+                rotations = 0;
+                new_pos
+            }
+            None => {
+                if rotations >= 4 {
+                    break;
+                } else if cc_toggled {
+                    dp = dp.next();
+                    cc_toggled = false;
+                    rotations += 1;
+                } else {
+                    cc = cc.toggle();
+                    cc_toggled = true;
+                }
+                pos
+            }
+        };
     }
-
     // white works as comment
     // black toggles codelchooser if afterwards still black move dp clockwise
     // when full rotation in same color block => exit
@@ -358,9 +403,110 @@ mod tests {
         let codel_size = 5;
 
         let block = get_block(&rgb_img, pos, codel_size);
-        let result = next_pos(&dp, &cc, &block, codel_size);
+        let result = next_pos(&dp, &cc, &block, codel_size, &rgb_img);
 
         let expected = Coordinates { x: 40, y: 75 };
+        assert_eq!(result.unwrap(), expected);
+    }
+    #[test]
+    fn in_range_bounds() {
+        let mut file = File::open("tests/fixtures/piet_hello_world.png").unwrap();
+        decoder::check_valid_png(&mut file);
+        let rgb_img = decoder::decode_png(file);
+
+        let coordinates = Coordinates { x: 150, y: 0 };
+        let result = in_range(&coordinates, &rgb_img);
+
+        assert_eq!(result, false);
+    }
+    #[test]
+    fn navigates_test_img() {
+        let mut file = File::open("tests/fixtures/piet_hello_world.png").unwrap();
+        decoder::check_valid_png(&mut file);
+        let rgb_img = decoder::decode_png(file);
+        let mut pos = Coordinates { x: 0, y: 0 };
+        let mut block: Vec<Coordinates>;
+        let codel_size = 5;
+
+        let mut result = Vec::new();
+        let mut dp = Direction::RIGHT;
+        let mut cc = CodelChooser::LEFT;
+
+        let mut cc_toggled = false;
+        let mut rotations = 0;
+        loop {
+            block = get_block(&rgb_img, pos, codel_size);
+            pos = match next_pos(&dp, &cc, &block, codel_size, &rgb_img) {
+                Some(new_pos) => {
+                    cc_toggled = false;
+                    rotations = 0;
+                    new_pos
+                }
+                None => {
+                    if rotations >= 4 {
+                        break;
+                    } else if cc_toggled {
+                        dp = dp.next();
+                        cc_toggled = false;
+                        rotations += 1;
+                    } else {
+                        cc = cc.toggle();
+                        cc_toggled = true;
+                    }
+                    pos
+                }
+            };
+            result.push(pos);
+        }
+        let expected = vec![
+            Coordinates { x: 55, y: 0 },
+            Coordinates { x: 60, y: 0 },
+            Coordinates { x: 95, y: 0 },
+            Coordinates { x: 100, y: 0 },
+            Coordinates { x: 100, y: 0 },
+            Coordinates { x: 100, y: 0 },
+            Coordinates { x: 145, y: 55 },
+            Coordinates { x: 140, y: 60 },
+            Coordinates { x: 140, y: 65 },
+            Coordinates { x: 140, y: 70 },
+            Coordinates { x: 140, y: 75 },
+            Coordinates { x: 125, y: 115 },
+            Coordinates { x: 125, y: 120 },
+            Coordinates { x: 125, y: 125 },
+            Coordinates { x: 125, y: 125 },
+            Coordinates { x: 125, y: 125 },
+            Coordinates { x: 105, y: 140 },
+            Coordinates { x: 100, y: 140 },
+            Coordinates { x: 45, y: 140 },
+            Coordinates { x: 40, y: 140 },
+            Coordinates { x: 35, y: 140 },
+            Coordinates { x: 35, y: 140 },
+            Coordinates { x: 35, y: 140 },
+            Coordinates { x: 40, y: 75 },
+            Coordinates { x: 40, y: 75 },
+            Coordinates { x: 40, y: 75 },
+            Coordinates { x: 45, y: 75 },
+            Coordinates { x: 50, y: 75 },
+            Coordinates { x: 50, y: 75 },
+            Coordinates { x: 50, y: 75 },
+            Coordinates { x: 50, y: 75 },
+            Coordinates { x: 50, y: 75 },
+            Coordinates { x: 15, y: 65 },
+            Coordinates { x: 10, y: 65 },
+            Coordinates { x: 10, y: 65 },
+            Coordinates { x: 10, y: 65 },
+            Coordinates { x: 20, y: 45 },
+            Coordinates { x: 20, y: 40 },
+            Coordinates { x: 20, y: 40 },
+            Coordinates { x: 20, y: 40 },
+            Coordinates { x: 20, y: 40 },
+            Coordinates { x: 20, y: 40 },
+            Coordinates { x: 20, y: 40 },
+            Coordinates { x: 20, y: 40 },
+            Coordinates { x: 20, y: 40 },
+            Coordinates { x: 20, y: 40 },
+        ];
+
         assert_eq!(result, expected);
     }
 }
