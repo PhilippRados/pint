@@ -3,6 +3,7 @@ use std::str;
 use std::{fs::File, io::Read};
 
 mod tests;
+use crate::types::RGB;
 
 struct PngChunk {
     chunk_type: String,
@@ -50,7 +51,7 @@ pub fn check_valid_png(file: &mut File) {
     const VALID_PNG: &str = "89504E470D0A1A0A";
 
     let first_bytes: &mut Vec<u8> = &mut vec![0; 8];
-    let is_valid_png = File::read(file, first_bytes);
+    let _ = File::read(file, first_bytes);
     if to_hex_string(first_bytes.to_vec()).join("") != VALID_PNG {
         eprintln!("pint: given file is not a valid png");
         std::process::exit(0);
@@ -208,9 +209,6 @@ fn add_to_array(current_row: &[u8], prev_row: &[RGB], filter: u8) -> Vec<RGB> {
     }
     result
 }
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct RGB(pub u8, pub u8, pub u8);
 
 fn parse_data(image_data: Vec<Vec<u8>>, pixel_width: usize) -> Vec<Vec<RGB>> {
     let mut inflated = Vec::new();
