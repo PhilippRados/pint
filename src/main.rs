@@ -1,5 +1,7 @@
 #![allow(unused)]
 use std::fs::File;
+use std::io;
+use std::io::Read;
 
 use navigation::*;
 use types::*;
@@ -33,6 +35,19 @@ const COLORS: [[RGB; 6]; 3] = [
         RGB(0, 0, 192),
         RGB(192, 0, 192),
     ],
+];
+const CMD: [[for<'r, 's, 't0> fn(
+    i32,
+    &'r mut Vec<i32>,
+    &'s mut types::CodelChooser,
+    &'t0 mut types::Direction,
+); 3]; 6] = [
+    [none, push, pop],
+    [add, sub, mult],
+    [div, modulo, not],
+    [greater, pointer, switch],
+    [dup, roll, in_num],
+    [in_char, out_num, out_char],
 ];
 
 fn none(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {}
@@ -149,25 +164,62 @@ fn dup(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Directio
     stack.push(top);
     stack.push(top);
 }
-fn roll(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {}
-fn in_num(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {}
-fn in_char(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {}
-fn out_num(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {}
-fn out_char(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {}
+fn roll(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
+    assert!(
+        stack.len() >= 2,
+        "Stack holds less than 2 elements cannot roll: {:?}",
+        stack
+    );
+    let rolls = stack.pop().unwrap();
+    let depth = stack.pop().unwrap();
+    let len = stack.len();
 
-const CMD: [[for<'r, 's, 't0> fn(
-    i32,
-    &'r mut Vec<i32>,
-    &'s mut types::CodelChooser,
-    &'t0 mut types::Direction,
-); 3]; 6] = [
-    [none, push, pop],
-    [add, sub, mult],
-    [div, modulo, not],
-    [greater, pointer, switch],
-    [dup, roll, in_num],
-    [in_char, out_num, out_char],
-];
+    if depth <= 0 || stack.len() < depth as usize {
+        // ignore command
+        stack.push(depth);
+        stack.push(rolls);
+    } else {
+        let mut sub = stack.split_off(len - depth as usize);
+        if rolls > 0 {
+            sub.rotate_right(rolls as usize)
+        } else {
+            sub.rotate_left(rolls.abs() as usize)
+        }
+        stack.append(&mut sub)
+    }
+}
+
+fn in_num(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
+    let mut buffer = String::new();
+    let mut stdin = io::stdin()
+        .read_line(&mut buffer)
+        .expect("Utf-8 encoded input");
+
+    match buffer.parse::<i32>() {
+        Ok(n) => stack.push(n),
+        Err(e) => panic!("Input not a number"),
+    }
+}
+fn in_char(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
+    let mut buffer = String::new();
+    let mut byte_unicode = io::stdin()
+        .bytes()
+        .next()
+        .and_then(|result| result.ok())
+        .map(|byte| byte as i32)
+        .expect("Utf-8 encoded input");
+
+    stack.push(byte_unicode)
+}
+
+fn out_num(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
+    let top = stack.pop().expect("Cannot pop from empty stack");
+    print!("{}", top as i32)
+}
+fn out_char(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
+    let top = stack.pop().expect("Cannot pop from empty stack");
+    print!("{}", std::char::from_u32(top as u32).unwrap())
+}
 
 fn get_color_index(color: RGB) -> Option<Coordinates> {
     for (y, dark_arr) in COLORS.iter().enumerate() {
@@ -195,15 +247,15 @@ fn calculate_color_diff(prev_color: RGB, color: RGB) -> Coordinates {
 }
 
 fn execute(
-    mut stack: Vec<i32>,
-    mut dp: Direction,
-    mut cc: CodelChooser,
+    stack: &mut Vec<i32>,
+    dp: &mut Direction,
+    cc: &mut CodelChooser,
     prev: ColorInfo,
-    current: ColorInfo,
+    current: &ColorInfo,
 ) {
     let color_diff = calculate_color_diff(prev.color, current.color);
 
-    CMD[color_diff.y as usize][color_diff.x as usize](prev.size, &mut stack, &mut cc, &mut dp);
+    CMD[color_diff.x as usize][color_diff.y as usize](current.size, stack, cc, dp);
 }
 
 fn main() {
@@ -226,23 +278,20 @@ fn main() {
     let mut cc = CodelChooser::LEFT;
     let mut pos = Coordinates { x: 0, y: 0 };
 
-    // const LIGHT: [&str; 3] = ["light", "normal", "dark"];
-    // const HUE: [&str; 6] = ["red", "yellow", "green", "cyan", "blue", "magenta"];
-
-    // let stack = Vec::new();
-    let prev_color = ColorInfo {
+    let mut stack = Vec::new();
+    let mut current_color = ColorInfo {
         color: rgb_img[pos.y as usize][pos.x as usize],
         size: get_size(&get_block(&rgb_img, pos, codel_size)),
     };
     loop {
-        let color = match next_color(&rgb_img, &mut pos, codel_size, &mut dp, &mut cc) {
+        let mut prev_color = current_color;
+        current_color = match next_color(&rgb_img, &mut pos, codel_size, &mut dp, &mut cc) {
             Some(new_color) => new_color,
             None => break,
         };
-
-        calculate_color_diff(prev_color.color, color.color);
-        // interprete(prev_color, new_color, &stack);
+        execute(&mut stack, &mut dp, &mut cc, prev_color, &current_color);
     }
+    println!("");
     // TODO implement white blocks
 }
 
@@ -286,5 +335,23 @@ mod tests {
         let expected = Coordinates { x: 0, y: 2 };
 
         assert_eq!(result, expected);
+    }
+    #[test]
+    fn roll_test1() {
+        let mut stack = vec![12, 3, 102, 33, 7, 4, 2];
+        let mut dp = Direction::UP;
+        let mut cc = CodelChooser::LEFT;
+
+        roll(3, &mut stack, &mut cc, &mut dp);
+        assert_eq!(stack, [12, 33, 7, 3, 102]);
+    }
+    #[test]
+    fn roll_test2() {
+        let mut stack = vec![1, 2, 3, 3, 1];
+        let mut dp = Direction::UP;
+        let mut cc = CodelChooser::LEFT;
+
+        roll(3, &mut stack, &mut cc, &mut dp);
+        assert_eq!(stack, [3, 1, 2]);
     }
 }
