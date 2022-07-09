@@ -10,6 +10,21 @@ mod decoder;
 mod navigation;
 mod types;
 
+macro_rules! unwrap_or_return {
+    ($e:expr) => {
+        match $e {
+            Some(x) => x,
+            None => return,
+        }
+    };
+    ($e:expr, $s:expr) => {
+        match $e {
+            Some(x) => x,
+            None => return $s,
+        }
+    };
+}
+
 const COLORS: [[RGB; 6]; 3] = [
     [
         RGB(255, 192, 192),
@@ -56,31 +71,18 @@ fn push(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Directi
     stack.push(size)
 }
 fn pop(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
-    let _ = match stack.pop() {
-        Some(v) => v,
-        None => return,
-    };
+    let _ = unwrap_or_return!(stack.pop());
 }
 fn add(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
-    assert!(
-        stack.len() >= 2,
-        "Stack holds less than 2 elements cannot add: {:?}",
-        stack
-    );
-    let top = stack.pop().unwrap();
-    let sec_top = stack.pop().unwrap();
+    let top = unwrap_or_return!(stack.pop());
+    let sec_top = unwrap_or_return!(stack.pop());
 
     stack.push(top + sec_top)
 }
 
 fn modulo(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
-    assert!(
-        stack.len() >= 2,
-        "Stack holds less than 2 elements cannot mod: {:?}",
-        stack
-    );
-    let top = stack.pop().unwrap();
-    let sec_top = stack.pop().unwrap();
+    let top = unwrap_or_return!(stack.pop());
+    let sec_top = unwrap_or_return!(stack.pop());
     // ignore command if div by 0 (recommended)
     if top == 0 {
         return;
@@ -90,7 +92,7 @@ fn modulo(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direc
 }
 
 fn not(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
-    let top = stack.pop().expect("Cannot pop from empty stack");
+    let top = unwrap_or_return!(stack.pop());
     if top != 0 {
         stack.push(0)
     } else {
@@ -98,35 +100,20 @@ fn not(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Directio
     }
 }
 fn sub(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
-    assert!(
-        stack.len() >= 2,
-        "Stack holds less than 2 elements cannot sub: {:?}",
-        stack
-    );
-    let top = stack.pop().unwrap();
-    let sec_top = stack.pop().unwrap();
+    let top = unwrap_or_return!(stack.pop());
+    let sec_top = unwrap_or_return!(stack.pop());
 
     stack.push(sec_top - top)
 }
 fn mult(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
-    assert!(
-        stack.len() >= 2,
-        "Stack holds less than 2 elements cannot mult: {:?}",
-        stack
-    );
-    let top = stack.pop().unwrap();
-    let sec_top = stack.pop().unwrap();
+    let top = unwrap_or_return!(stack.pop());
+    let sec_top = unwrap_or_return!(stack.pop());
 
     stack.push(sec_top * top)
 }
 fn div(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
-    assert!(
-        stack.len() >= 2,
-        "Stack holds less than 2 elements cannot mod: {:?}",
-        stack
-    );
-    let top = stack.pop().unwrap();
-    let sec_top = stack.pop().unwrap();
+    let top = unwrap_or_return!(stack.pop());
+    let sec_top = unwrap_or_return!(stack.pop());
     // ignore command if div by 0 (recommended)
     if top == 0 {
         return;
@@ -135,13 +122,8 @@ fn div(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Directio
     stack.push(sec_top / top)
 }
 fn greater(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
-    assert!(
-        stack.len() >= 2,
-        "Stack holds less than 2 elements cannot mod: {:?}",
-        stack
-    );
-    let top = stack.pop().unwrap();
-    let sec_top = stack.pop().unwrap();
+    let top = unwrap_or_return!(stack.pop());
+    let sec_top = unwrap_or_return!(stack.pop());
 
     if sec_top > top {
         stack.push(1)
@@ -150,34 +132,25 @@ fn greater(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Dire
     }
 }
 fn pointer(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
-    let top = stack.pop().expect("Cant pop from empty stack");
+    let top = unwrap_or_return!(stack.pop());
     for _ in 0..top {
         *dp = dp.next();
     }
 }
 fn switch(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
-    let top = stack.pop().expect("Cant pop from empty stack");
+    let top = unwrap_or_return!(stack.pop());
     for _ in 0..top.abs() {
         cc.toggle();
     }
 }
 fn dup(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
-    let top = match stack.pop() {
-        Some(v) => v,
-        None => return,
-    };
-
+    let top = unwrap_or_return!(stack.pop());
     stack.push(top);
     stack.push(top);
 }
 fn roll(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
-    assert!(
-        stack.len() >= 2,
-        "Stack holds less than 2 elements cannot roll: {:?}",
-        stack
-    );
-    let rolls = stack.pop().unwrap();
-    let depth = stack.pop().unwrap();
+    let rolls = unwrap_or_return!(stack.pop());
+    let depth = unwrap_or_return!(stack.pop());
     let len = stack.len();
 
     if depth <= 0 || stack.len() < depth as usize {
@@ -219,14 +192,11 @@ fn in_char(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Dire
 }
 
 fn out_num(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
-    let top = stack.pop().expect("Cannot pop from empty stack");
+    let top = unwrap_or_return!(stack.pop());
     print!("{}", top as i32)
 }
 fn out_char(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
-    let top = match stack.pop() {
-        Some(v) => v,
-        None => return,
-    };
+    let top = unwrap_or_return!(stack.pop());
     print!("{}", std::char::from_u32(top as u32).unwrap())
 }
 
@@ -245,18 +215,9 @@ pub fn get_color_index(color: RGB) -> Option<Coordinates> {
 }
 
 fn calculate_color_diff(prev_color: RGB, color: RGB) -> Coordinates {
-    // ignores invalid colors like white
-    // let prev = get_color_index(prev_color).unwrap_or_else(|| -> return Coordinates { x: 0, y: 0 });
-    // let current = get_color_index(color).unwrap_or_else(||->Coordinates { x: 0, y: 0 });
+    let prev = unwrap_or_return!(get_color_index(prev_color), Coordinates { x: 0, y: 0 });
+    let current = unwrap_or_return!(get_color_index(color), Coordinates { x: 0, y: 0 });
 
-    let prev = match get_color_index(prev_color) {
-        Some(v) => v,
-        None => return Coordinates { x: 0, y: 0 },
-    };
-    let current = match get_color_index(color) {
-        Some(v) => v,
-        None => return Coordinates { x: 0, y: 0 },
-    };
     Coordinates {
         x: (current.x - prev.x).rem_euclid(6), // basically pythons () % 6
         y: (current.y - prev.y).rem_euclid(3),

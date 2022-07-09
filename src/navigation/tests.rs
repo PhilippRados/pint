@@ -102,13 +102,7 @@ mod tests {
 
         let expected = Coordinates { x: 40, y: 75 };
         // assert_eq!(result.unwrap(), expected);
-        assert_eq!(
-            match result {
-                ColorResult::Valid(r) => r,
-                ColorResult::Edge(r) => panic!("pos on edge"),
-            },
-            expected
-        );
+        assert_eq!(result.unwrap(), expected);
     }
     #[test]
     fn in_range_bounds() {
@@ -139,12 +133,12 @@ mod tests {
         loop {
             block = get_block(&rgb_img, pos, codel_size);
             pos = match next_pos(&dp, &cc, &block, codel_size, &rgb_img) {
-                ColorResult::Valid(new_pos) => {
+                Some(new_pos) => {
                     cc_toggled = false;
                     rotations = 0;
                     new_pos
                 }
-                ColorResult::Edge(new_pos) => {
+                None => {
                     if rotations >= 4 {
                         break;
                     } else if cc_toggled {
