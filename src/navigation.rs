@@ -1,4 +1,4 @@
-use crate::types::*;
+use crate::{get_color_index, types::*};
 mod tests;
 
 fn block_dp_corners(dp: &Direction, block: &Vec<Coordinates>) -> (Coordinates, Coordinates) {
@@ -135,6 +135,11 @@ pub fn get_block(rgb_img: &Vec<Vec<RGB>>, pos: Coordinates, codel_size: i32) -> 
     let color = rgb_img[pos.y as usize][pos.x as usize];
     let mut current_pos = pos;
 
+    if get_color_index(rgb_img[pos.y as usize][pos.x as usize]) == None {
+        counted.push(Coordinates { ..pos });
+        return counted;
+    }
+
     while not_counted.len() > 0 {
         while in_range(&current_pos, &rgb_img) && is_color(&current_pos, &rgb_img, color) {
             if not_counted.contains(&current_pos) {
@@ -177,19 +182,16 @@ pub fn next_color(
     let mut cc_toggled = false;
     let mut rotations = 0;
 
-    let block = get_block(&rgb_img, *pos, codel_size);
-    let block_size = get_size(&block);
-
+    let mut block = get_block(&rgb_img, *pos, codel_size);
     // loops until found next color-block
     loop {
         match next_pos(&dp, &cc, &block, codel_size, &rgb_img) {
             Some(new_pos) => {
-                cc_toggled = false;
-                rotations = 0;
                 *pos = new_pos;
+                block = get_block(&rgb_img, *pos, codel_size);
                 return Some(ColorInfo {
-                    color: rgb_img[new_pos.y as usize][new_pos.x as usize],
-                    size: block_size,
+                    color: rgb_img[pos.y as usize][pos.x as usize],
+                    size: get_size(&block),
                 });
             }
             None => {

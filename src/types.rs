@@ -1,4 +1,4 @@
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum Direction {
     // maybe as hashmap
     RIGHT,
@@ -7,6 +7,7 @@ pub enum Direction {
     UP,
 }
 
+#[derive(Copy, Clone)]
 pub struct ColorInfo {
     pub color: RGB,
     pub size: i32,
@@ -37,6 +38,7 @@ pub struct Coordinates {
     pub y: i32,
 }
 
+#[derive(Debug)]
 pub enum CodelChooser {
     LEFT,
     RIGHT,

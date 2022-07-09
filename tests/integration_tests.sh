@@ -12,14 +12,18 @@ function assert_eq {
   fi
 
   $(cargo r -q tests/fixtures/"$fixture" -c "$cs" >& tmp)
-  result=$(diff tests/snapshots/"$snapshot" tmp)
+  result=$(diff tests/snapshots/"$snapshot" tmp 2> err)
+  error=$(cat err)
 
-  if [ "$result" = "" ];
+  if [[ "$result" = "" && "$error" = "" ]];
     then printf "\x1b[32mPASSED!\x1b[0m $name\n"
     else printf "\x1b[31mFAILED!\x1b[0m $name\nexpected: '$(cat tests/snapshots/"$snapshot")'\nactual: '$(cat tmp)'\n\n"
   fi
   rm tmp
+  rm err
 }
 
+# call tests with bash tests/integration_tests.sh
 assert_eq "failure-input-file-not-found" "" "5" "missing input"
 assert_eq "success_hello_world" "piet_hello_world.png" "5" "piet_hello_world"
+assert_eq "success_valentine" "valentines.png" "1" "valentines"

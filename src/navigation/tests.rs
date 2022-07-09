@@ -101,7 +101,14 @@ mod tests {
         let result = next_pos(&dp, &cc, &block, codel_size, &rgb_img);
 
         let expected = Coordinates { x: 40, y: 75 };
-        assert_eq!(result.unwrap(), expected);
+        // assert_eq!(result.unwrap(), expected);
+        assert_eq!(
+            match result {
+                ColorResult::Valid(r) => r,
+                ColorResult::Edge(r) => panic!("pos on edge"),
+            },
+            expected
+        );
     }
     #[test]
     fn in_range_bounds() {
@@ -132,12 +139,12 @@ mod tests {
         loop {
             block = get_block(&rgb_img, pos, codel_size);
             pos = match next_pos(&dp, &cc, &block, codel_size, &rgb_img) {
-                Some(new_pos) => {
+                ColorResult::Valid(new_pos) => {
                     cc_toggled = false;
                     rotations = 0;
                     new_pos
                 }
-                None => {
+                ColorResult::Edge(new_pos) => {
                     if rotations >= 4 {
                         break;
                     } else if cc_toggled {
@@ -231,4 +238,43 @@ mod tests {
 
         assert_eq!(result, expected);
     }
+    // #[test]
+    // fn get_correct_colors_valentines() {
+    //     let mut file = File::open("tests/fixtures/valentines.png").unwrap();
+    //     decoder::check_valid_png(&mut file);
+    //     let rgb_img = decoder::decode_png(file);
+    //     let mut pos = Coordinates { x: 0, y: 0 };
+    //     let codel_size = 1;
+
+    //     let mut result = Vec::new();
+    //     let mut dp = Direction::RIGHT;
+    //     let mut cc = CodelChooser::LEFT;
+
+    //     for i in 0..30 {
+    //         let color = match next_color(&rgb_img, &mut pos, codel_size, &mut dp, &mut cc) {
+    //             Some(new_color) => new_color.color,
+    //             None => break,
+    //         };
+    //         dbg!(color);
+    //         result.push(color);
+    //     }
+    //     // let result = next_color(&rgb_img, &mut pos, codel_size, &mut dp, &mut cc)
+    //     let expected = vec![
+    //         RGB(192, 0, 0),
+    //         RGB(0, 0, 192),
+    //         RGB(192, 255, 192),
+    //         RGB(192, 192, 0),
+    //         RGB(255, 255, 0),
+    //         RGB(192, 192, 0),
+    //         RGB(0, 0, 192),
+    //         RGB(0, 255, 255),
+    //         RGB(192, 0, 0),
+    //         // RGB(192, 192, 255),
+    //         // RGB(255, 255, 0),
+    //         // RGB(192, 192, 0),
+    //         // RGB(255, 255, 192),
+    //     ];
+
+    //     assert_eq!(result, expected);
+    // }
 }

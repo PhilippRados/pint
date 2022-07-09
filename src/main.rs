@@ -36,6 +36,7 @@ const COLORS: [[RGB; 6]; 3] = [
         RGB(192, 0, 192),
     ],
 ];
+
 const CMD: [[for<'r, 's, 't0> fn(
     i32,
     &'r mut Vec<i32>,
@@ -55,8 +56,10 @@ fn push(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Directi
     stack.push(size)
 }
 fn pop(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
-    let _ = stack.pop().expect("Cannot pop from empty stack");
-    ()
+    let _ = match stack.pop() {
+        Some(v) => v,
+        None => return,
+    };
 }
 fn add(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
     assert!(
@@ -149,7 +152,7 @@ fn greater(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Dire
 fn pointer(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
     let top = stack.pop().expect("Cant pop from empty stack");
     for _ in 0..top {
-        dp.next();
+        *dp = dp.next();
     }
 }
 fn switch(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
@@ -159,7 +162,10 @@ fn switch(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direc
     }
 }
 fn dup(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
-    let top = stack.pop().expect("Cant pop from empty stack");
+    let top = match stack.pop() {
+        Some(v) => v,
+        None => return,
+    };
 
     stack.push(top);
     stack.push(top);
@@ -217,11 +223,14 @@ fn out_num(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Dire
     print!("{}", top as i32)
 }
 fn out_char(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
-    let top = stack.pop().expect("Cannot pop from empty stack");
+    let top = match stack.pop() {
+        Some(v) => v,
+        None => return,
+    };
     print!("{}", std::char::from_u32(top as u32).unwrap())
 }
 
-fn get_color_index(color: RGB) -> Option<Coordinates> {
+pub fn get_color_index(color: RGB) -> Option<Coordinates> {
     for (y, dark_arr) in COLORS.iter().enumerate() {
         for x in 0..dark_arr.len() {
             if color == dark_arr[x] {
@@ -236,10 +245,18 @@ fn get_color_index(color: RGB) -> Option<Coordinates> {
 }
 
 fn calculate_color_diff(prev_color: RGB, color: RGB) -> Coordinates {
-    // get color indices and calculate diff
-    let prev = get_color_index(prev_color).unwrap();
-    let current = get_color_index(color).unwrap();
+    // ignores invalid colors like white
+    // let prev = get_color_index(prev_color).unwrap_or_else(|| -> return Coordinates { x: 0, y: 0 });
+    // let current = get_color_index(color).unwrap_or_else(||->Coordinates { x: 0, y: 0 });
 
+    let prev = match get_color_index(prev_color) {
+        Some(v) => v,
+        None => return Coordinates { x: 0, y: 0 },
+    };
+    let current = match get_color_index(color) {
+        Some(v) => v,
+        None => return Coordinates { x: 0, y: 0 },
+    };
     Coordinates {
         x: (current.x - prev.x).rem_euclid(6), // basically pythons () % 6
         y: (current.y - prev.y).rem_euclid(3),
@@ -255,7 +272,7 @@ fn execute(
 ) {
     let color_diff = calculate_color_diff(prev.color, current.color);
 
-    CMD[color_diff.x as usize][color_diff.y as usize](current.size, stack, cc, dp);
+    CMD[color_diff.x as usize][color_diff.y as usize](prev.size, stack, cc, dp);
 }
 
 fn main() {
@@ -289,10 +306,10 @@ fn main() {
             Some(new_color) => new_color,
             None => break,
         };
+        // println!("{:?}", pos);
         execute(&mut stack, &mut dp, &mut cc, prev_color, &current_color);
     }
     println!("");
-    // TODO implement white blocks
 }
 
 #[cfg(test)]
