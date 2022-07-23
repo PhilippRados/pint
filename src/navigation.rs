@@ -1,52 +1,45 @@
 use crate::{get_color_index, types::*};
+use core::slice::Iter;
 mod tests;
 
+fn get_x(p: &&Coordinates) -> i32 {
+    p.x
+}
+fn get_y(p: &&Coordinates) -> i32 {
+    p.y
+}
+
+fn get_min(iter: Iter<'_, Coordinates>, get_field: fn(&&Coordinates) -> i32) -> i32 {
+    get_field(&iter.min_by_key(get_field).unwrap())
+}
+fn get_max(iter: Iter<'_, Coordinates>, get_field: fn(&&Coordinates) -> i32) -> i32 {
+    get_field(&iter.max_by_key(get_field).unwrap())
+}
+type CoordGetter = fn(&&Coordinates) -> i32;
+
 fn block_dp_corners(dp: &Direction, block: &Vec<Coordinates>) -> (Coordinates, Coordinates) {
+    let (get_direction_field, get_width_field): (CoordGetter, CoordGetter) = match *dp {
+        Direction::RIGHT | Direction::LEFT => (get_x, get_y),
+        Direction::DOWN | Direction::UP => (get_y, get_x),
+    };
+    let min_or_max = match *dp {
+        Direction::RIGHT | Direction::DOWN => get_max,
+        Direction::LEFT | Direction::UP => get_min,
+    };
+    let direction_limit = min_or_max(block.iter(), get_direction_field);
+
+    let edge: Vec<Coordinates> = block
+        .iter()
+        .filter(|pos| get_direction_field(pos) == direction_limit)
+        .cloned()
+        .collect();
+
+    let min = *edge.iter().min_by_key(get_width_field).unwrap();
+    let max = *edge.iter().max_by_key(get_width_field).unwrap();
+
     match *dp {
-        Direction::RIGHT => {
-            let edge: Vec<Coordinates> = block
-                .iter()
-                .filter(|pos| pos.x == block.iter().max_by_key(|p| p.x).unwrap().x)
-                .cloned()
-                .collect();
-            (
-                *edge.iter().min_by_key(|p| p.y).unwrap(),
-                *edge.iter().max_by_key(|p| p.y).unwrap(),
-            )
-        }
-        Direction::DOWN => {
-            let edge: Vec<Coordinates> = block
-                .iter()
-                .filter(|pos| pos.y == block.iter().max_by_key(|p| p.y).unwrap().y)
-                .cloned()
-                .collect();
-            (
-                *edge.iter().max_by_key(|p| p.x).unwrap(),
-                *edge.iter().min_by_key(|p| p.x).unwrap(),
-            )
-        }
-        Direction::LEFT => {
-            let edge: Vec<Coordinates> = block
-                .iter()
-                .filter(|pos| pos.x == block.iter().min_by_key(|p| p.x).unwrap().x)
-                .cloned()
-                .collect();
-            (
-                *edge.iter().max_by_key(|p| p.y).unwrap(),
-                *edge.iter().min_by_key(|p| p.y).unwrap(),
-            )
-        }
-        Direction::UP => {
-            let edge: Vec<Coordinates> = block
-                .iter()
-                .filter(|pos| pos.y == block.iter().min_by_key(|p| p.y).unwrap().y)
-                .cloned()
-                .collect();
-            (
-                *edge.iter().min_by_key(|p| p.x).unwrap(),
-                *edge.iter().max_by_key(|p| p.x).unwrap(),
-            )
-        }
+        Direction::LEFT | Direction::DOWN => (max, min),
+        Direction::RIGHT | Direction::UP => (min, max),
     }
 }
 
