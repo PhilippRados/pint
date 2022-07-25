@@ -3,3 +3,4 @@
 Cargo.lock
 .ipynb_checkpoints/
 plot_rgb.ipynb
+flamegraph.svg

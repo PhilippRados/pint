@@ -259,7 +259,7 @@ fn main() {
     let mut stack = Vec::new();
     let mut current_color = ColorInfo {
         color: rgb_img[pos.y as usize][pos.x as usize],
-        size: get_size(&get_block(&rgb_img, pos, codel_size)),
+        size: get_size(&get_block(&rgb_img, pos, codel_size, dp)),
     };
     loop {
         let mut prev_color = current_color;
@@ -267,10 +267,8 @@ fn main() {
             Some(new_color) => new_color,
             None => break,
         };
-        // println!("{:?}", pos);
         execute(&mut stack, &mut dp, &mut cc, prev_color, &current_color);
     }
-    println!("");
 }
 
 #[cfg(test)]

@@ -91,6 +91,12 @@ fn is_color(new_pos: &Coordinates, rgb_img: &Vec<Vec<RGB>>, color: RGB) -> bool 
     rgb_img[new_pos.y as usize][new_pos.x as usize] == color
 }
 
+const CORDS: [Coordinates; 4] = [
+    Coordinates { x: 1, y: 0 },  //RIGHT
+    Coordinates { x: 0, y: 1 },  // DOWN
+    Coordinates { x: -1, y: 0 }, // LEFT
+    Coordinates { x: 0, y: -1 }, // UP
+];
 fn check_adjacent_codels(
     current_pos: Coordinates,
     codel_size: i32,
@@ -99,13 +105,6 @@ fn check_adjacent_codels(
     not_counted: &mut Vec<Coordinates>,
     color: RGB,
 ) {
-    const CORDS: [Coordinates; 4] = [
-        Coordinates { x: 1, y: 0 },  //RIGHT
-        Coordinates { x: 0, y: 1 },  // DOWN
-        Coordinates { x: -1, y: 0 }, // LEFT
-        Coordinates { x: 0, y: -1 }, // UP
-    ];
-
     for direction in CORDS {
         let new_pos = Coordinates {
             x: current_pos.x + (direction.x * codel_size),
@@ -121,7 +120,31 @@ fn check_adjacent_codels(
     }
 }
 
-pub fn get_block(rgb_img: &Vec<Vec<RGB>>, pos: Coordinates, codel_size: i32) -> Vec<Coordinates> {
+fn get_last_codel_in_dir(
+    current_pos: &mut Coordinates,
+    rgb_img: &Vec<Vec<RGB>>,
+    color: RGB,
+    dp: Direction,
+) -> Coordinates {
+    let mut result = Vec::new();
+    while in_range(&current_pos, &rgb_img) && is_color(&current_pos, &rgb_img, color) {
+        result.push(Coordinates { ..*current_pos });
+        match dp {
+            Direction::RIGHT => current_pos.x += 1,
+            Direction::DOWN => current_pos.y += 1,
+            Direction::LEFT => current_pos.x -= 1,
+            Direction::UP => current_pos.y -= 1,
+        }
+    }
+    result.pop().unwrap()
+}
+
+pub fn get_block(
+    rgb_img: &Vec<Vec<RGB>>,
+    pos: Coordinates,
+    codel_size: i32,
+    dp: Direction,
+) -> Vec<Coordinates> {
     let mut counted: Vec<Coordinates> = Vec::new();
     let mut not_counted: Vec<Coordinates> = Vec::new();
     not_counted.push(Coordinates { ..pos });
@@ -129,7 +152,7 @@ pub fn get_block(rgb_img: &Vec<Vec<RGB>>, pos: Coordinates, codel_size: i32) -> 
     let mut current_pos = pos;
 
     if get_color_index(rgb_img[pos.y as usize][pos.x as usize]) == None {
-        counted.push(Coordinates { ..pos });
+        counted.push(get_last_codel_in_dir(&mut current_pos, rgb_img, color, dp));
         return counted;
     }
 
@@ -175,13 +198,13 @@ pub fn next_color(
     let mut cc_toggled = false;
     let mut rotations = 0;
 
-    let mut block = get_block(&rgb_img, *pos, codel_size);
+    let mut block = get_block(&rgb_img, *pos, codel_size, *dp);
     // loops until found next color-block
     loop {
         match next_pos(&dp, &cc, &block, codel_size, &rgb_img) {
             Some(new_pos) => {
                 *pos = new_pos;
-                block = get_block(&rgb_img, *pos, codel_size);
+                block = get_block(&rgb_img, *pos, codel_size, *dp);
                 return Some(ColorInfo {
                     color: rgb_img[pos.y as usize][pos.x as usize],
                     size: get_size(&block),

@@ -9,8 +9,9 @@ mod tests {
         let mut file = File::open("tests/fixtures/piet_hello_world.png").unwrap();
         decoder::check_valid_png(&mut file);
         let rgb_img = decoder::decode_png(file);
+        let dp = Direction::RIGHT;
 
-        let block = get_block(&rgb_img, Coordinates { x: 0, y: 0 }, 5);
+        let block = get_block(&rgb_img, Coordinates { x: 0, y: 0 }, 5, dp);
         let result = get_size(&block);
 
         assert_eq!(result, 72);
@@ -20,8 +21,9 @@ mod tests {
         let mut file = File::open("tests/fixtures/piet_hello_world.png").unwrap();
         decoder::check_valid_png(&mut file);
         let rgb_img = decoder::decode_png(file);
+        let dp = Direction::RIGHT;
 
-        let block = get_block(&rgb_img, Coordinates { x: 60, y: 0 }, 5);
+        let block = get_block(&rgb_img, Coordinates { x: 60, y: 0 }, 5, dp);
         let result = get_size(&block);
         assert_eq!(result, 101);
     }
@@ -97,7 +99,7 @@ mod tests {
         let pos = Coordinates { x: 15, y: 55 };
         let codel_size = 5;
 
-        let block = get_block(&rgb_img, pos, codel_size);
+        let block = get_block(&rgb_img, pos, codel_size, dp);
         let result = next_pos(&dp, &cc, &block, codel_size, &rgb_img);
 
         let expected = Coordinates { x: 40, y: 75 };
@@ -131,7 +133,7 @@ mod tests {
         let mut cc_toggled = false;
         let mut rotations = 0;
         loop {
-            block = get_block(&rgb_img, pos, codel_size);
+            block = get_block(&rgb_img, pos, codel_size, dp);
             pos = match next_pos(&dp, &cc, &block, codel_size, &rgb_img) {
                 Some(new_pos) => {
                     cc_toggled = false;
@@ -232,43 +234,151 @@ mod tests {
 
         assert_eq!(result, expected);
     }
-    // #[test]
-    // fn get_correct_colors_valentines() {
-    //     let mut file = File::open("tests/fixtures/valentines.png").unwrap();
-    //     decoder::check_valid_png(&mut file);
-    //     let rgb_img = decoder::decode_png(file);
-    //     let mut pos = Coordinates { x: 0, y: 0 };
-    //     let codel_size = 1;
+    #[test]
+    fn get_all_codels_in_dir_test() {
+        let mut file = File::open("tests/fixtures/valentines.png").unwrap();
+        decoder::check_valid_png(&mut file);
+        let rgb_img = decoder::decode_png(file);
+        let mut current_pos = Coordinates { x: 1, y: 16 };
+        let color = rgb_img[current_pos.y as usize][current_pos.x as usize];
+        let dp = Direction::DOWN;
 
-    //     let mut result = Vec::new();
-    //     let mut dp = Direction::RIGHT;
-    //     let mut cc = CodelChooser::LEFT;
+        let result = get_last_codel_in_dir(&mut current_pos, &rgb_img, color, dp);
+        let expected = Coordinates { x: 1, y: 29 };
+        assert_eq!(result, expected);
+    }
+    #[test]
+    fn get_correct_colors_valentines() {
+        let mut file = File::open("tests/fixtures/valentines.png").unwrap();
+        decoder::check_valid_png(&mut file);
+        let rgb_img = decoder::decode_png(file);
+        let mut pos = Coordinates { x: 0, y: 0 };
+        let codel_size = 1;
 
-    //     for i in 0..30 {
-    //         let color = match next_color(&rgb_img, &mut pos, codel_size, &mut dp, &mut cc) {
-    //             Some(new_color) => new_color.color,
-    //             None => break,
-    //         };
-    //         dbg!(color);
-    //         result.push(color);
-    //     }
-    //     // let result = next_color(&rgb_img, &mut pos, codel_size, &mut dp, &mut cc)
-    //     let expected = vec![
-    //         RGB(192, 0, 0),
-    //         RGB(0, 0, 192),
-    //         RGB(192, 255, 192),
-    //         RGB(192, 192, 0),
-    //         RGB(255, 255, 0),
-    //         RGB(192, 192, 0),
-    //         RGB(0, 0, 192),
-    //         RGB(0, 255, 255),
-    //         RGB(192, 0, 0),
-    //         // RGB(192, 192, 255),
-    //         // RGB(255, 255, 0),
-    //         // RGB(192, 192, 0),
-    //         // RGB(255, 255, 192),
-    //     ];
+        let mut result = Vec::new();
+        let mut dp = Direction::RIGHT;
+        let mut cc = CodelChooser::LEFT;
 
-    //     assert_eq!(result, expected);
-    // }
+        for i in 0..108 {
+            let color = match next_color(&rgb_img, &mut pos, codel_size, &mut dp, &mut cc) {
+                Some(new_color) => new_color.color,
+                None => break,
+            };
+            result.push(color);
+        }
+        let expected = vec![
+            RGB(192, 0, 0),
+            RGB(0, 0, 192),
+            RGB(255, 255, 255),
+            RGB(192, 255, 192),
+            RGB(192, 192, 0),
+            RGB(255, 255, 0),
+            RGB(192, 192, 0),
+            RGB(255, 255, 255),
+            RGB(0, 0, 192),
+            RGB(0, 255, 255),
+            RGB(255, 255, 255),
+            RGB(255, 255, 255),
+            RGB(192, 0, 0),
+            RGB(0, 0, 192),
+            RGB(192, 192, 255),
+            RGB(255, 255, 255),
+            RGB(255, 255, 0),
+            RGB(192, 192, 0),
+            RGB(255, 255, 192),
+            RGB(0, 0, 255),
+            RGB(255, 255, 255),
+            RGB(255, 255, 255),
+            RGB(0, 0, 255),
+            RGB(255, 255, 192),
+            RGB(192, 192, 0),
+            RGB(255, 255, 0),
+            RGB(255, 255, 255),
+            RGB(192, 192, 255),
+            RGB(0, 0, 192),
+            RGB(192, 192, 255),
+            RGB(255, 255, 255),
+            RGB(255, 255, 0),
+            RGB(192, 192, 0),
+            RGB(255, 255, 192),
+            RGB(0, 0, 255),
+            RGB(255, 255, 255),
+            RGB(255, 255, 255),
+            RGB(0, 0, 255),
+            RGB(255, 255, 192),
+            RGB(192, 192, 0),
+            RGB(255, 255, 0),
+            RGB(255, 255, 255),
+            RGB(192, 192, 255),
+            RGB(0, 0, 192),
+            RGB(192, 192, 255),
+            RGB(255, 255, 255),
+            RGB(255, 255, 0),
+            RGB(192, 192, 0),
+            RGB(255, 255, 192),
+            RGB(0, 0, 255),
+            RGB(255, 255, 255),
+            RGB(255, 255, 255),
+            RGB(0, 0, 255),
+            RGB(255, 255, 192),
+            RGB(192, 192, 0),
+            RGB(255, 255, 0),
+            RGB(255, 255, 255),
+            RGB(192, 192, 255),
+            RGB(0, 0, 192),
+            RGB(192, 192, 255),
+            RGB(255, 255, 255),
+            RGB(255, 255, 0),
+            RGB(192, 192, 0),
+            RGB(255, 255, 192),
+            RGB(0, 0, 255),
+            RGB(255, 255, 255),
+            RGB(255, 255, 255),
+            RGB(0, 0, 255),
+            RGB(255, 255, 192),
+            RGB(192, 192, 0),
+            RGB(255, 255, 0),
+            RGB(255, 255, 255),
+            RGB(192, 192, 255),
+            RGB(0, 0, 192),
+            RGB(192, 192, 255),
+            RGB(255, 255, 255),
+            RGB(255, 255, 0),
+            RGB(192, 192, 0),
+            RGB(255, 255, 192),
+            RGB(0, 0, 255),
+            RGB(255, 255, 255),
+            RGB(255, 255, 255),
+            RGB(0, 0, 255),
+            RGB(255, 255, 192),
+            RGB(192, 192, 0),
+            RGB(255, 255, 0),
+            RGB(255, 255, 255),
+            RGB(192, 192, 255),
+            RGB(0, 0, 192),
+            RGB(192, 192, 255),
+            RGB(255, 255, 255),
+            RGB(255, 255, 0),
+            RGB(192, 192, 0),
+            RGB(255, 255, 192),
+            RGB(0, 0, 255),
+            RGB(255, 255, 255),
+            RGB(255, 255, 255),
+            RGB(0, 0, 255),
+            RGB(255, 255, 192),
+            RGB(192, 192, 0),
+            RGB(255, 255, 0),
+            RGB(255, 255, 255),
+            RGB(192, 192, 255),
+            RGB(0, 0, 192),
+            RGB(192, 192, 255),
+            RGB(255, 255, 255),
+            RGB(255, 255, 0),
+            RGB(192, 192, 0),
+        ];
+        dbg!(result.len());
+        dbg!(expected.len());
+
+        assert_eq!(result, expected);
+    }
 }
