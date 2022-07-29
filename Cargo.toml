@@ -3,9 +3,18 @@ name = "pint"
 version = "0.1.0"
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "pint"
 
 [dependencies]
 clap = { version = "3.1.18", features = ["derive"] }
 inflate = { version = "0.4.5" }
 tempfile = "3"
+criterion = "0.3"
+
+[[bench]]
+name = "bench"
+harness = false
+
+[profile.release]
+debug = true

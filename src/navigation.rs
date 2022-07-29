@@ -1,4 +1,5 @@
-use crate::{get_color_index, types::*};
+use crate::interpreter::get_color_index;
+use crate::types::*;
 use core::slice::Iter;
 mod tests;
 
@@ -146,8 +147,6 @@ pub fn get_block(
     dp: Direction,
 ) -> Vec<Coordinates> {
     let mut counted: Vec<Coordinates> = Vec::new();
-    let mut not_counted: Vec<Coordinates> = Vec::new();
-    not_counted.push(Coordinates { ..pos });
     let color = rgb_img[pos.y as usize][pos.x as usize];
     let mut current_pos = pos;
 
@@ -155,6 +154,9 @@ pub fn get_block(
         counted.push(get_last_codel_in_dir(&mut current_pos, rgb_img, color, dp));
         return counted;
     }
+
+    let mut not_counted: Vec<Coordinates> = Vec::new();
+    not_counted.push(Coordinates { ..pos });
 
     while not_counted.len() > 0 {
         while in_range(&current_pos, &rgb_img) && is_color(&current_pos, &rgb_img, color) {
