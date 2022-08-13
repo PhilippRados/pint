@@ -165,6 +165,7 @@ fn in_num(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direc
         .read_line(&mut buffer)
         .expect("Utf-8 encoded input");
 
+    buffer.pop(); // remove \n
     match buffer.parse::<i32>() {
         Ok(n) => stack.push(n),
         Err(e) => panic!("Input not a number"),

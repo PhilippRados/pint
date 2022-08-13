@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::decoder::*;
+    // TRUECOLOR-RGB IMAGE TESTS
 
     #[test]
     fn can_parse_chunks() {
@@ -79,7 +80,7 @@ mod tests {
         assert_eq!(result.width, 150);
         assert_eq!(result.height, 145);
         assert_eq!(result.bit_depth, 8);
-        assert_eq!(result.color_type, 2);
+        assert_eq!(result.color_type, ColorType::TrueColorRGB);
     }
     #[test]
     fn can_convert_multibyte_arr_to_int() {
@@ -97,7 +98,7 @@ mod tests {
     use std::process::Command;
     use tempfile::NamedTempFile;
     #[test]
-    fn can_parse_idat_to_rgb() {
+    fn can_parse_truecolor_rgb_idat_to_rgb() {
         let idat = vec![vec![
             120, 218, 237, 221, 81, 110, 234, 48, 16, 64, 209, 166, 98, 95, 241, 210, 237, 149,
             185, 253, 181, 43, 25, 220, 152, 140, 175, 184, 231, 15, 245, 169, 228, 113, 53, 234,
@@ -136,8 +137,9 @@ mod tests {
             153, 16, 207, 132, 120, 38, 196, 51, 33, 158, 9, 241, 76, 136, 103, 66, 60, 19, 226,
             153, 16, 207, 132, 120, 38, 196, 251, 1, 201, 164, 87, 175,
         ]];
-        let byte_width = 150;
-        let result = parse_data(idat, byte_width);
+        let mut meta = IHDRData::default();
+        meta.width = 150;
+        let result = parse_data(idat, meta, None);
 
         // result is too big so its stored in temp-file
         let mut tmp_file = NamedTempFile::new().expect("");
@@ -146,6 +148,68 @@ mod tests {
         // correct file output is compared to test-file
         let output = Command::new("diff")
             .arg("./tests/fixtures/correct_rgb_idat")
+            .arg(tmp_file.path())
+            .output()
+            .expect("failed to run diff-process");
+
+        assert_eq!(output.stdout, []);
+        assert_eq!(output.stderr, []);
+    }
+
+    // INDEXED IMAGE TESTS
+
+    #[test]
+    fn can_parse_indexed_idat_to_rgb() {
+        let idat = vec![vec![
+            104, 222, 237, 217, 57, 14, 194, 64, 16, 68, 81, 179, 122, 48, 139, 89, 238, 127, 87,
+            194, 170, 160, 164, 22, 168, 33, 250, 63, 66, 200, 244, 115, 212, 26, 236, 105, 250,
+            174, 253, 7, 237, 212, 4, 7, 7, 7, 215, 203, 157, 212, 80, 173, 220, 65, 193, 193, 193,
+            193, 53, 115, 249, 138, 242, 38, 242, 207, 70, 12, 14, 14, 14, 238, 47, 92, 222, 142,
+            153, 203, 131, 55, 106, 85, 179, 130, 131, 131, 131, 251, 29, 151, 7, 219, 197, 54,
+            237, 166, 108, 130, 93, 176, 40, 91, 192, 112, 112, 112, 112, 205, 220, 89, 205, 177,
+            173, 178, 19, 220, 85, 217, 19, 182, 151, 90, 98, 112, 112, 112, 112, 205, 156, 109,
+            60, 51, 242, 185, 46, 255, 167, 205, 223, 90, 23, 5, 7, 7, 7, 215, 204, 217, 215, 153,
+            179, 105, 199, 170, 44, 219, 90, 134, 131, 131, 131, 107, 230, 236, 243, 168, 178, 105,
+            118, 6, 44, 119, 166, 29, 29, 225, 224, 224, 224, 154, 57, 59, 149, 229, 237, 88, 190,
+            224, 44, 239, 210, 95, 134, 194, 193, 193, 193, 245, 114, 119, 101, 143, 213, 140, 179,
+            141, 103, 39, 67, 27, 241, 84, 246, 30, 193, 30, 204, 61, 20, 28, 28, 28, 92, 47, 247,
+            6, 249, 170, 78, 59,
+        ]];
+
+        let plte = Some(vec![
+            RGB(255, 255, 192),
+            RGB(0, 255, 255),
+            RGB(192, 255, 192),
+            RGB(192, 192, 0),
+            RGB(255, 255, 0),
+            RGB(0, 255, 0),
+            RGB(255, 0, 0),
+            RGB(0, 192, 0),
+            RGB(255, 255, 255),
+            RGB(0, 0, 0),
+            RGB(192, 192, 255),
+            RGB(0, 0, 192),
+            RGB(0, 0, 255),
+            RGB(192, 0, 0),
+            RGB(255, 0, 255),
+            RGB(192, 255, 255),
+            RGB(255, 192, 192),
+            RGB(0, 192, 192),
+            RGB(255, 192, 255),
+            RGB(192, 0, 192),
+        ]);
+        let mut meta = IHDRData::default();
+        meta.width = 110;
+        meta.color_type = ColorType::Indexed;
+        let result = parse_data(idat, meta, plte);
+
+        // result is too big so its stored in temp-file
+        let mut tmp_file = NamedTempFile::new().expect("");
+        writeln!(tmp_file, "{:?}", result);
+
+        // correct file output is compared to test-file
+        let output = Command::new("diff")
+            .arg("./tests/fixtures/correct_index_idat")
             .arg(tmp_file.path())
             .output()
             .expect("failed to run diff-process");

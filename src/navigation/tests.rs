@@ -376,8 +376,6 @@ mod tests {
             RGB(255, 255, 0),
             RGB(192, 192, 0),
         ];
-        dbg!(result.len());
-        dbg!(expected.len());
 
         assert_eq!(result, expected);
     }

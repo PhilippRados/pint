@@ -23,7 +23,12 @@ function assert_eq {
   rm err
 }
 
-# call tests with bash tests/integration_tests.sh
 assert_eq "failure-input-file-not-found" "" "5" "missing input"
+
+# All truecolor-rgb and bit-depth 8
 assert_eq "success_hello_world" "piet_hello_world.png" "5" "piet_hello_world"
 assert_eq "success_valentine" "valentines.png" "1" "valentines"
+assert_eq "success_fizzbuzz" "fizzbuzz.png" "1" "fizzbuzz"
+
+# indexed palette bit-depth 8
+assert_eq "success_hello_world" "artsy_hello_world.png" "5" "indexed_hello_world"
