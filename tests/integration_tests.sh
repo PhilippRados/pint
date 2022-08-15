@@ -31,4 +31,4 @@ assert_eq "success_valentine" "valentines.png" "1" "valentines"
 assert_eq "success_fizzbuzz" "fizzbuzz.png" "1" "fizzbuzz"
 
 # indexed palette bit-depth 8
-assert_eq "success_hello_world" "artsy_hello_world.png" "5" "indexed_hello_world"
+assert_eq "success_indexed_hello_world" "artsy_hello_world.png" "5" "indexed_hello_world"

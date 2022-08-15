@@ -108,61 +108,50 @@ fn parse_ihdr(data: Vec<u8>) -> IHDRData {
             _ => panic!("Image Color-type is not Indexed or TrueColorRGB"),
         },
     };
-    // assert!(result.bit_depth == 8, "images need bit-depth of 8");
+    assert!(result.bit_depth == 8, "images need bit-depth of 8");
     result
 }
 
-fn sub_filter(current_pixel: RGB, prev_pixel: RGB) -> RGB {
-    RGB(
-        ((current_pixel.0 as i16 + prev_pixel.0 as i16) % 256) as u8,
-        ((current_pixel.1 as i16 + prev_pixel.1 as i16) % 256) as u8,
-        ((current_pixel.2 as i16 + prev_pixel.2 as i16) % 256) as u8,
-    )
+#[derive(Clone, Copy, Debug)]
+enum RGBorU8 {
+    RGB(RGB),
+    U8(u8),
 }
 
-fn up_filter(current_pixel: RGB, prev_row_pixel: RGB) -> RGB {
-    RGB(
-        ((current_pixel.0 as i16 + prev_row_pixel.0 as i16) % 256) as u8,
-        ((current_pixel.1 as i16 + prev_row_pixel.1 as i16) % 256) as u8,
-        ((current_pixel.2 as i16 + prev_row_pixel.2 as i16) % 256) as u8,
-    )
+fn get_current_pixel(
+    current_row: &[u8],
+    line_pos: usize,
+    plte: &Option<Vec<RGB>>,
+    color_type: &ColorType,
+) -> RGBorU8 {
+    match color_type {
+        ColorType::TrueColorRGB => RGBorU8::RGB(RGB(
+            current_row[line_pos],
+            current_row[line_pos + 1],
+            current_row[line_pos + 2],
+        )),
+        ColorType::Indexed => RGBorU8::U8(current_row[line_pos]),
+    }
 }
 
-fn avg_filter(current_pixel: RGB, prev_row_pixel: RGB, prev_pixel: RGB) -> RGB {
-    RGB(
-        ((current_pixel.0 as i16 + (prev_row_pixel.0 + prev_pixel.0) as i16 / 2) % 256) as u8,
-        ((current_pixel.1 as i16 + (prev_row_pixel.1 + prev_pixel.1) as i16 / 2) % 256) as u8,
-        ((current_pixel.2 as i16 + (prev_row_pixel.2 + prev_pixel.2) as i16 / 2) % 256) as u8,
-    )
+fn none(current_pixel: u8, prev_pixel: u8, up_pixel: u8, diag_pixel: u8) -> u8 {
+    current_pixel
 }
-
-fn paeth_filter(current_pixel: RGB, prev_row_pixel: RGB, prev_pixel: RGB, diag_pixel: RGB) -> RGB {
-    RGB(
-        paeth_filter_single(
-            current_pixel.0 as i16,
-            prev_pixel.0 as i16,
-            prev_row_pixel.0 as i16,
-            diag_pixel.0 as i16,
-        ),
-        paeth_filter_single(
-            current_pixel.1 as i16,
-            prev_pixel.1 as i16,
-            prev_row_pixel.1 as i16,
-            diag_pixel.1 as i16,
-        ),
-        paeth_filter_single(
-            current_pixel.2 as i16,
-            prev_pixel.2 as i16,
-            prev_row_pixel.2 as i16,
-            diag_pixel.2 as i16,
-        ),
-    )
+fn sub_filter(current_pixel: u8, prev_pixel: u8, up_pixel: u8, diag_pixel: u8) -> u8 {
+    // can safely cast back to u8 because % 256 <= 255
+    ((current_pixel as u16 + prev_pixel as u16) % 256 as u16) as u8
 }
-fn paeth_filter_single(current_pixel: i16, prev_pixel: i16, up_pixel: i16, diag_pixel: i16) -> u8 {
-    let p = prev_pixel + up_pixel - diag_pixel;
-    let p_left_pixel = (p - prev_pixel).abs();
-    let p_up_pixel = (p - up_pixel).abs();
-    let p_diag_pixel = (p - diag_pixel).abs();
+fn up_filter(current_pixel: u8, prev_pixel: u8, up_pixel: u8, diag_pixel: u8) -> u8 {
+    ((current_pixel as u16 + up_pixel as u16) % 256 as u16) as u8
+}
+fn avg_filter(current_pixel: u8, prev_pixel: u8, up_pixel: u8, diag_pixel: u8) -> u8 {
+    ((current_pixel as i16 + (up_pixel + prev_pixel) as i16 / 2) % 256) as u8
+}
+fn paeth_filter(current_pixel: u8, prev_pixel: u8, up_pixel: u8, diag_pixel: u8) -> u8 {
+    let p = prev_pixel as i16 + up_pixel as i16 - diag_pixel as i16;
+    let p_left_pixel = (p - prev_pixel as i16).abs();
+    let p_up_pixel = (p - up_pixel as i16).abs();
+    let p_diag_pixel = (p - diag_pixel as i16).abs();
 
     let mut prediction = 0;
     if p_left_pixel <= p_up_pixel && p_left_pixel <= p_diag_pixel {
@@ -175,92 +164,106 @@ fn paeth_filter_single(current_pixel: i16, prev_pixel: i16, up_pixel: i16, diag_
     ((current_pixel as i16 + prediction as i16) % 256) as u8
 }
 
-fn get_current_pixel(
-    current_row: &[u8],
-    line_pos: usize,
+fn do_filter(
+    i: usize,
+    current: RGBorU8,
+    prev: &mut RGBorU8,
+    up: RGBorU8,
+    diag: RGBorU8,
     plte: &Option<Vec<RGB>>,
-    color_type: &ColorType,
 ) -> RGB {
-    match color_type {
-        ColorType::TrueColorRGB => RGB(
-            current_row[line_pos],
-            current_row[line_pos + 1],
-            current_row[line_pos + 2],
-        ),
-        ColorType::Indexed => (*plte).as_ref().expect("plte exists on indexed color-type")
-            [current_row[line_pos] as usize],
+    let filter = [none, sub_filter, up_filter, avg_filter, paeth_filter];
+    assert!(i < filter.len(), "No such filter exists");
+
+    match current {
+        RGBorU8::RGB(c) => {
+            let p = match prev {
+                RGBorU8::RGB(p) => p,
+                _ => panic!("RGB values dont store u8"),
+            };
+
+            let u = match up {
+                RGBorU8::RGB(u) => u,
+                _ => panic!("RGB values dont store u8"),
+            };
+            let d = match diag {
+                RGBorU8::RGB(d) => d,
+                _ => panic!("RGB values dont store u8"),
+            };
+            let applied = RGB(
+                filter[i](c.0, p.0, u.0, d.0),
+                filter[i](c.1, p.1, u.1, d.1),
+                filter[i](c.2, p.2, u.2, d.2),
+            );
+            *prev = RGBorU8::RGB(applied);
+            applied
+        }
+        RGBorU8::U8(c) => {
+            let p = match prev {
+                RGBorU8::U8(p) => *p,
+                _ => panic!("Indexed values dont store RGB"),
+            };
+            let u = match up {
+                RGBorU8::U8(u) => u,
+                _ => panic!("U8 values dont store RGB"),
+            };
+            let d = match diag {
+                RGBorU8::U8(d) => d,
+                _ => panic!("U8 values dont store RGB"),
+            };
+
+            let applied = filter[i](c, p, u, d);
+            *prev = RGBorU8::U8(applied);
+            (*plte).as_ref().expect("plte exists on indexed color-type")[applied as usize]
+        }
     }
 }
 
-fn get_prev_row_pixel(prev_row: &[RGB], line_pos: usize, num_channels: usize) -> RGB {
-    RGB(
-        prev_row[(line_pos - 1) / num_channels].0,
-        prev_row[(line_pos - 1) / num_channels].1,
-        prev_row[(line_pos - 1) / num_channels].2,
-    )
-}
-
-fn get_diag_pixel(prev_row: &[RGB], line_pos: usize, num_channels: usize) -> RGB {
-    if ((line_pos - 1) / num_channels) > 0 {
-        RGB(
-            prev_row[((line_pos - 1) / num_channels) - 1].0,
-            prev_row[((line_pos - 1) / num_channels) - 1].1,
-            prev_row[((line_pos - 1) / num_channels) - 1].2,
-        )
+fn get_diag_pixel(
+    prev_row: &[RGBorU8],
+    line_pos: usize,
+    default_val: RGBorU8,
+    color_type: &ColorType,
+) -> RGBorU8 {
+    if (line_pos as i16 / color_type.num_channels() as i16) - 1 >= 0 {
+        prev_row[(line_pos / color_type.num_channels()) - 1]
     } else {
-        RGB(0, 0, 0)
+        default_val
     }
 }
+
 fn apply_filter(
     current_row: &[u8],
-    prev_row: &[RGB],
-    filter: u8,
+    prev_row: &mut Vec<RGBorU8>,
+    filter_index: usize,
     color_type: &ColorType,
     plte: &Option<Vec<RGB>>,
+    default_val: RGBorU8,
 ) -> Vec<RGB> {
-    let mut line_pos = 1;
-    let mut prev_pixel = RGB(0, 0, 0);
+    let mut line_pos = 0;
+    let mut prev_pixel = default_val;
     let mut result: Vec<RGB> = Vec::new();
+    let mut current_row_applied = Vec::new();
 
     while line_pos < current_row.len() - (color_type.num_channels() - 1) {
-        match filter {
-            0 => result.push(get_current_pixel(current_row, line_pos, plte, color_type)),
-            1 => {
-                let pixel = sub_filter(
-                    get_current_pixel(current_row, line_pos, plte, color_type),
-                    prev_pixel,
-                );
-                result.push(pixel);
-                prev_pixel = pixel;
-            }
-            2 => result.push(up_filter(
-                get_current_pixel(current_row, line_pos, plte, color_type),
-                get_prev_row_pixel(prev_row, line_pos, color_type.num_channels()),
-            )),
-            3 => {
-                let pixel = avg_filter(
-                    get_current_pixel(current_row, line_pos, plte, color_type),
-                    get_prev_row_pixel(prev_row, line_pos, color_type.num_channels()),
-                    prev_pixel,
-                );
-                result.push(pixel);
-                prev_pixel = pixel;
-            }
-            4 => {
-                let pixel = paeth_filter(
-                    get_current_pixel(current_row, line_pos, plte, color_type),
-                    get_prev_row_pixel(prev_row, line_pos, color_type.num_channels()),
-                    prev_pixel,
-                    get_diag_pixel(prev_row, line_pos, color_type.num_channels()),
-                );
-                result.push(pixel);
-                prev_pixel = pixel;
-            }
-            _ => eprintln!("this filter doesn't exist"),
-        }
+        let pixel = get_current_pixel(current_row, line_pos, plte, color_type);
+        let up = prev_row[line_pos / color_type.num_channels()];
+        let diag = get_diag_pixel(prev_row, line_pos, default_val, color_type);
+
+        result.push(do_filter(
+            filter_index,
+            pixel,
+            &mut prev_pixel,
+            up,
+            diag,
+            plte,
+        ));
+        current_row_applied.push(prev_pixel);
 
         line_pos += color_type.num_channels();
     }
+    *prev_row = current_row_applied;
+
     result
 }
 
@@ -268,6 +271,7 @@ fn parse_data(
     image_data: Vec<Vec<u8>>,
     meta_data: IHDRData,
     plte: Option<Vec<RGB>>,
+    default_val: RGBorU8,
 ) -> Vec<Vec<RGB>> {
     let mut inflated = Vec::new();
     for i in image_data {
@@ -275,27 +279,28 @@ fn parse_data(
     }
     let mut rgb_img: Vec<Vec<RGB>> = Vec::new();
     let mut j = 0;
-    let mut i = 0;
     let byte_width = meta_data.width as usize * meta_data.color_type.num_channels();
-    let prev_row: &mut [RGB] = &mut vec![RGB(0, 0, 0); meta_data.width as usize];
+    let mut prev_row: Vec<RGBorU8> = vec![default_val; meta_data.width as usize];
 
+    let mut i = 0;
     while j + byte_width < inflated.len() {
-        let current_row = &inflated[j..j + byte_width + 1]; // + 1 for the line-filter
-        let filter = current_row[0];
+        i += 1;
+        let filter = inflated[j] as usize;
+        let current_row = &inflated[j + 1..j + byte_width + 1]; // + 1 for the line-filter
 
         rgb_img.push(apply_filter(
             current_row,
-            prev_row,
+            &mut prev_row,
             filter,
             &meta_data.color_type,
             &plte,
+            default_val,
         ));
 
-        prev_row.clone_from_slice(&rgb_img[i]);
         j += byte_width + 1;
-        i += 1;
     }
-    return rgb_img;
+
+    rgb_img
 }
 
 fn parse_plte(data: Vec<u8>) -> Vec<RGB> {
@@ -339,7 +344,12 @@ pub fn decode_png(mut file: File) -> Vec<Vec<RGB>> {
                 data.push(chunk.data);
             }
             "IEND" => {
-                rgb_img = parse_data(data, meta_data, plte);
+                let default_val = match meta_data.color_type {
+                    ColorType::TrueColorRGB => RGBorU8::RGB(RGB(0, 0, 0)),
+                    ColorType::Indexed => RGBorU8::U8(0),
+                };
+                rgb_img = parse_data(data, meta_data, plte, default_val);
+
                 break;
             }
             _ => {
@@ -349,5 +359,5 @@ pub fn decode_png(mut file: File) -> Vec<Vec<RGB>> {
         }
         i += chunk.chunk_len as u32;
     }
-    return rgb_img;
+    rgb_img
 }

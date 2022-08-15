@@ -1,6 +1,9 @@
 #[cfg(test)]
 mod tests {
     use crate::decoder::*;
+    use std::io::Write;
+    use std::process::Command;
+    use tempfile::NamedTempFile;
     // TRUECOLOR-RGB IMAGE TESTS
 
     #[test]
@@ -94,9 +97,6 @@ mod tests {
         let result = bytes_to_int(&buf[..]);
         assert_eq!(result, 155);
     }
-    use std::io::Write;
-    use std::process::Command;
-    use tempfile::NamedTempFile;
     #[test]
     fn can_parse_truecolor_rgb_idat_to_rgb() {
         let idat = vec![vec![
@@ -139,7 +139,10 @@ mod tests {
         ]];
         let mut meta = IHDRData::default();
         meta.width = 150;
-        let result = parse_data(idat, meta, None);
+        meta.color_type = ColorType::TrueColorRGB;
+        let result = parse_data(idat, meta, None, RGBorU8::RGB(RGB(0, 0, 0)));
+
+        // println!("{:?}",result);
 
         // result is too big so its stored in temp-file
         let mut tmp_file = NamedTempFile::new().expect("");
@@ -201,7 +204,7 @@ mod tests {
         let mut meta = IHDRData::default();
         meta.width = 110;
         meta.color_type = ColorType::Indexed;
-        let result = parse_data(idat, meta, plte);
+        let result = parse_data(idat, meta, plte, RGBorU8::U8(0));
 
         // result is too big so its stored in temp-file
         let mut tmp_file = NamedTempFile::new().expect("");
