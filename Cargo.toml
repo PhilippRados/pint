@@ -2,6 +2,13 @@
 name = "pint"
 version = "0.1.0"
 edition = "2018"
+authors = ["Philipp Rados"]
+
+description = "A Piet Interpreter with a builting PNG-decoder"
+repository = "https://github.com/PhilippRados/pint"
+keywords = ["piet", "interpreter", "decoder", "cli"]
+
+license = "MIT"
 
 [lib]
 name = "pint"
