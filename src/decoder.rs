@@ -386,6 +386,9 @@ pub fn infer_codel_size(rgb_img: &Vec<Vec<RGB>>) -> i32 {
     if min_size < 1 {
         eprintln!("warning: inferred codel-size less than 1 => defaults to 1");
         1
+    } else if rgb_img[0].len() as i32 % min_size != 0 || rgb_img.len() as i32 % min_size != 0 {
+        eprintln!("warning: inferred codel-size doesnt fit image-dimensions => defaults to 1");
+        1
     } else {
         min_size
     }
