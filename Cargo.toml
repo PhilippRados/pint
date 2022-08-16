@@ -9,6 +9,8 @@ name = "pint"
 [dependencies]
 clap = { version = "3.1.18", features = ["derive"] }
 inflate = { version = "0.4.5" }
+
+[dev-dependencies]
 tempfile = "3"
 criterion = "0.3"
 

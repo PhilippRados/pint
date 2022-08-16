@@ -9,7 +9,10 @@ use pint::types::*;
 fn main() {
     let opt = cli_options();
 
-    let codel_size = opt.value_of("codel_size").unwrap().parse::<i32>().unwrap();
+    let mut codel_size = match opt.value_of("codel_size") {
+        Some(v) => v.parse::<i32>().unwrap(),
+        None => -1,
+    };
     let path = opt.value_of("file").unwrap();
     let mut file = match File::open(path) {
         Err(why) => {
@@ -21,6 +24,9 @@ fn main() {
 
     check_valid_png(&mut file);
     let rgb_img = decode_png(file);
+    if codel_size == -1 {
+        codel_size = infer_codel_size(&rgb_img);
+    }
 
     let mut dp = Direction::RIGHT;
     let mut cc = CodelChooser::LEFT;

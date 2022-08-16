@@ -350,3 +350,43 @@ pub fn decode_png(mut file: File) -> Vec<Vec<RGB>> {
     }
     rgb_img
 }
+pub fn infer_codel_size(rgb_img: &Vec<Vec<RGB>>) -> i32 {
+    let mut min_size = i32::MAX;
+    let mut current_size = 1i32;
+    let mut current_color: RGB;
+
+    // go from left to right through img
+    for y in 0..rgb_img.len() {
+        let mut prev_color: RGB = rgb_img[y][0];
+        for x in 1..rgb_img[0].len() {
+            current_color = rgb_img[y][x];
+            if prev_color == current_color {
+                current_size += 1;
+            } else if current_size < min_size {
+                min_size = current_size;
+                current_size = 1;
+            }
+            prev_color = current_color;
+        }
+    }
+    // go from top to bottom through img
+    for x in 0..rgb_img[0].len() {
+        let mut prev_color: RGB = rgb_img[0][x];
+        for y in 1..rgb_img.len() {
+            current_color = rgb_img[y][x];
+            if prev_color == current_color {
+                current_size += 1;
+            } else if current_size < min_size {
+                min_size = current_size;
+                current_size = 1;
+            }
+            prev_color = current_color;
+        }
+    }
+    if min_size < 1 {
+        eprintln!("warning: inferred codel-size less than 1 => defaults to 1");
+        1
+    } else {
+        min_size
+    }
+}

@@ -1,13 +1,5 @@
 use clap::{Arg, ArgMatches, Command};
 
-fn validate_codel_size(size: String) -> Result<(), String> {
-    let n = size.parse::<u32>().expect("Codel size must be number");
-    if n > 0 {
-        Ok(())
-    } else {
-        Err(String::from("Codel size must be number greater 0"))
-    }
-}
 pub fn cli_options() -> ArgMatches {
     Command::new("piet interpreter")
         .author("Philipp Rados")
@@ -26,12 +18,12 @@ pub fn cli_options() -> ArgMatches {
                 .help("The size of a codel in pixels")
                 .short('c')
                 .long("codel-size")
-                .default_value("1")
                 .long_help(
-                    "Piet works by going through the pixels of an image.\n\
-                    However, this makes piet images visually small when viewing them.\n\
-                    Thus, piet allows interpreting images in codels which consist of larger pixels blocks.\n\
-                    Setting codel-size to 2 would mean a codel is the size of 2x2 pixels.",
+                    "Piet code takes the form of graphics made up of the recognised colours.\n
+                    Individual pixels of colour are significant in the language, \n
+                    so it is common for programs to be enlarged for viewing so that the details are easily visible.\n
+                    In such enlarged programs, the term 'codel' is used to mean a block of colour equivalent to a single pixel of code,\n
+                    to avoid confusion with the actual pixels of the enlarged graphic, of which many may make up one codel."
                 )
                 .takes_value(true)
                 .required(false)
