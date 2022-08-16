@@ -58,4 +58,14 @@ mod tests {
         roll(3, &mut stack, &mut cc, &mut dp);
         assert_eq!(stack, [3, 1, 2]);
     }
+    #[test]
+    fn switch_test() {
+        let mut stack = vec![1, 2, 3, 3, 1];
+        let mut dp = Direction::UP;
+        let mut cc = CodelChooser::LEFT;
+
+        switch(3, &mut stack, &mut cc, &mut dp);
+        assert_eq!(stack, [1, 2, 3, 3]);
+        assert_eq!(cc, CodelChooser::RIGHT);
+    }
 }

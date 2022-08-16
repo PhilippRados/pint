@@ -38,7 +38,7 @@ pub struct Coordinates {
     pub y: i32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum CodelChooser {
     LEFT,
     RIGHT,

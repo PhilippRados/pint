@@ -1,6 +1,7 @@
 #![allow(unused)]
 mod tests;
 use std::io;
+use std::io::Write;
 
 use crate::types::*;
 use std::io::Read;
@@ -131,7 +132,7 @@ fn pointer(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Dire
 fn switch(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
     let top = unwrap_or_return!(stack.pop());
     for _ in 0..top.abs() {
-        cc.toggle();
+        *cc = cc.toggle();
     }
 }
 fn dup(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
@@ -149,29 +150,36 @@ fn roll(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Directi
         stack.push(depth);
         stack.push(rolls);
     } else {
+        let rolls = rolls % depth;
         let mut sub = stack.split_off(len - depth as usize);
         if rolls > 0 {
             sub.rotate_right(rolls as usize)
         } else {
-            sub.rotate_left(rolls.unsigned_abs() as usize)
+            sub.rotate_left((rolls * -1) as usize)
         }
         stack.append(&mut sub)
     }
 }
 
 fn in_num(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
+    print!("> ");
+    // forces to print everything everything before input
+    io::stdout().flush();
+
     let mut buffer = String::new();
-    let mut stdin = io::stdin()
+    let stdin = io::stdin()
         .read_line(&mut buffer)
         .expect("Utf-8 encoded input");
 
-    buffer.pop(); // remove \n
-    match buffer.parse::<i32>() {
+    match buffer.trim().parse::<i32>() {
         Ok(n) => stack.push(n),
-        Err(e) => panic!("Input not a number"),
+        Err(e) => eprintln!("input not a number"),
     }
 }
 fn in_char(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Direction) {
+    print!("> ");
+    io::stdout().flush();
+
     let mut buffer = String::new();
     let mut byte_unicode = io::stdin()
         .bytes()
