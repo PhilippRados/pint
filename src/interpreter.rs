@@ -153,7 +153,7 @@ fn roll(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Directi
         if rolls > 0 {
             sub.rotate_right(rolls as usize)
         } else {
-            sub.rotate_left(rolls.abs() as usize)
+            sub.rotate_left(rolls.unsigned_abs() as usize)
         }
         stack.append(&mut sub)
     }
@@ -194,8 +194,8 @@ fn out_char(size: i32, stack: &mut Vec<i32>, cc: &mut CodelChooser, dp: &mut Dir
 
 pub fn get_color_index(color: RGB) -> Option<Coordinates> {
     for (y, dark_arr) in COLORS.iter().enumerate() {
-        for x in 0..dark_arr.len() {
-            if color == dark_arr[x] {
+        for (x, item) in dark_arr.iter().enumerate() {
+            if color == *item {
                 return Some(Coordinates {
                     x: x as i32,
                     y: y as i32,

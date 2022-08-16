@@ -5,24 +5,13 @@ use std::{fs::File, io::Read};
 mod tests;
 use crate::types::RGB;
 
+#[derive(Default)]
 struct PngChunk {
     chunk_type: String,
     data_len: usize,
     chunk_len: usize,
     data: Vec<u8>,
     crc: Vec<u8>,
-}
-
-impl Default for PngChunk {
-    fn default() -> PngChunk {
-        PngChunk {
-            chunk_type: String::new(),
-            data_len: 0,
-            chunk_len: 0,
-            data: vec![],
-            crc: vec![],
-        }
-    }
 }
 
 #[derive(PartialEq, Debug)]
@@ -114,7 +103,7 @@ fn parse_ihdr(data: Vec<u8>) -> IHDRData {
 
 #[derive(Clone, Copy, Debug)]
 enum RGBorU8 {
-    RGB(RGB),
+    Rgb(RGB),
     U8(u8),
 }
 
@@ -125,7 +114,7 @@ fn get_current_pixel(
     color_type: &ColorType,
 ) -> RGBorU8 {
     match color_type {
-        ColorType::TrueColorRGB => RGBorU8::RGB(RGB(
+        ColorType::TrueColorRGB => RGBorU8::Rgb(RGB(
             current_row[line_pos],
             current_row[line_pos + 1],
             current_row[line_pos + 2],
@@ -139,10 +128,10 @@ fn none(current_pixel: u8, prev_pixel: u8, up_pixel: u8, diag_pixel: u8) -> u8 {
 }
 fn sub_filter(current_pixel: u8, prev_pixel: u8, up_pixel: u8, diag_pixel: u8) -> u8 {
     // can safely cast back to u8 because % 256 <= 255
-    ((current_pixel as u16 + prev_pixel as u16) % 256 as u16) as u8
+    ((current_pixel as u16 + prev_pixel as u16) % 256_u16) as u8
 }
 fn up_filter(current_pixel: u8, prev_pixel: u8, up_pixel: u8, diag_pixel: u8) -> u8 {
-    ((current_pixel as u16 + up_pixel as u16) % 256 as u16) as u8
+    ((current_pixel as u16 + up_pixel as u16) % 256_u16) as u8
 }
 fn avg_filter(current_pixel: u8, prev_pixel: u8, up_pixel: u8, diag_pixel: u8) -> u8 {
     ((current_pixel as i16 + (up_pixel + prev_pixel) as i16 / 2) % 256) as u8
@@ -176,18 +165,18 @@ fn do_filter(
     assert!(i < filter.len(), "No such filter exists");
 
     match current {
-        RGBorU8::RGB(c) => {
+        RGBorU8::Rgb(c) => {
             let p = match prev {
-                RGBorU8::RGB(p) => p,
+                RGBorU8::Rgb(p) => p,
                 _ => panic!("RGB values dont store u8"),
             };
 
             let u = match up {
-                RGBorU8::RGB(u) => u,
+                RGBorU8::Rgb(u) => u,
                 _ => panic!("RGB values dont store u8"),
             };
             let d = match diag {
-                RGBorU8::RGB(d) => d,
+                RGBorU8::Rgb(d) => d,
                 _ => panic!("RGB values dont store u8"),
             };
             let applied = RGB(
@@ -195,7 +184,7 @@ fn do_filter(
                 filter[i](c.1, p.1, u.1, d.1),
                 filter[i](c.2, p.2, u.2, d.2),
             );
-            *prev = RGBorU8::RGB(applied);
+            *prev = RGBorU8::Rgb(applied);
             applied
         }
         RGBorU8::U8(c) => {
@@ -225,7 +214,7 @@ fn get_diag_pixel(
     default_val: RGBorU8,
     color_type: &ColorType,
 ) -> RGBorU8 {
-    if (line_pos as i16 / color_type.num_channels() as i16) - 1 >= 0 {
+    if (line_pos as i16 / color_type.num_channels() as i16) > 0 {
         prev_row[(line_pos / color_type.num_channels()) - 1]
     } else {
         default_val
@@ -314,7 +303,7 @@ fn parse_plte(data: Vec<u8>) -> Vec<RGB> {
 }
 
 pub fn decode_png(mut file: File) -> Vec<Vec<RGB>> {
-    let file_byte_size = File::metadata(&mut file).unwrap().len();
+    let file_byte_size = File::metadata(&file).unwrap().len();
     let buf: &mut [u8] = &mut vec![0; (file_byte_size - 8) as usize]; // cut of beginning identifier sequence
     let result = File::read(&mut file, buf);
     let mut i: u32 = 0;
@@ -345,7 +334,7 @@ pub fn decode_png(mut file: File) -> Vec<Vec<RGB>> {
             }
             "IEND" => {
                 let default_val = match meta_data.color_type {
-                    ColorType::TrueColorRGB => RGBorU8::RGB(RGB(0, 0, 0)),
+                    ColorType::TrueColorRGB => RGBorU8::Rgb(RGB(0, 0, 0)),
                     ColorType::Indexed => RGBorU8::U8(0),
                 };
                 rgb_img = parse_data(data, meta_data, plte, default_val);

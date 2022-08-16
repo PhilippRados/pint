@@ -18,7 +18,7 @@ fn get_max(iter: Iter<'_, Coordinates>, get_field: fn(&&Coordinates) -> i32) -> 
 }
 type CoordGetter = fn(&&Coordinates) -> i32;
 
-fn block_dp_corners(dp: &Direction, block: &Vec<Coordinates>) -> (Coordinates, Coordinates) {
+fn block_dp_corners(dp: &Direction, block: &[Coordinates]) -> (Coordinates, Coordinates) {
     let (get_direction_field, get_width_field): (CoordGetter, CoordGetter) = match *dp {
         Direction::RIGHT | Direction::LEFT => (get_x, get_y),
         Direction::DOWN | Direction::UP => (get_y, get_x),
@@ -47,7 +47,7 @@ fn block_dp_corners(dp: &Direction, block: &Vec<Coordinates>) -> (Coordinates, C
 fn next_pos(
     dp: &Direction,
     cc: &CodelChooser,
-    block: &Vec<Coordinates>,
+    block: &[Coordinates],
     codel_size: i32,
     rgb_img: &Vec<Vec<RGB>>,
 ) -> Option<Coordinates> {
@@ -64,7 +64,7 @@ fn next_pos(
         },
     };
 
-    if !in_range(&new_pos, rgb_img) || is_color(&new_pos, &rgb_img, RGB(0, 0, 0)) {
+    if !in_range(&new_pos, rgb_img) || is_color(&new_pos, rgb_img, RGB(0, 0, 0)) {
         None
     } else {
         Some(new_pos)
@@ -81,14 +81,10 @@ fn in_range(new_pos: &Coordinates, rgb_img: &Vec<Vec<RGB>>) -> bool {
     let x_pos = new_pos.x;
     let y_pos = new_pos.y;
 
-    if x_pos < width && x_pos >= 0 && y_pos < height && y_pos >= 0 {
-        true
-    } else {
-        false
-    }
+    x_pos < width && x_pos >= 0 && y_pos < height && y_pos >= 0
 }
 
-fn is_color(new_pos: &Coordinates, rgb_img: &Vec<Vec<RGB>>, color: RGB) -> bool {
+fn is_color(new_pos: &Coordinates, rgb_img: &[Vec<RGB>], color: RGB) -> bool {
     rgb_img[new_pos.y as usize][new_pos.x as usize] == color
 }
 
@@ -102,7 +98,7 @@ fn check_adjacent_codels(
     current_pos: Coordinates,
     codel_size: i32,
     rgb_img: &Vec<Vec<RGB>>,
-    counted: &mut Vec<Coordinates>,
+    counted: &mut [Coordinates],
     not_counted: &mut Vec<Coordinates>,
     color: RGB,
 ) {
@@ -112,8 +108,8 @@ fn check_adjacent_codels(
             y: current_pos.y + (direction.y * codel_size),
         };
 
-        if in_range(&new_pos, &rgb_img)
-            && is_color(&new_pos, &rgb_img, color)
+        if in_range(&new_pos, rgb_img)
+            && is_color(&new_pos, rgb_img, color)
             && !counted.contains(&new_pos)
         {
             not_counted.push(new_pos);
@@ -128,7 +124,7 @@ fn get_last_codel_in_dir(
     dp: Direction,
 ) -> Coordinates {
     let mut result = Vec::new();
-    while in_range(&current_pos, &rgb_img) && is_color(&current_pos, &rgb_img, color) {
+    while in_range(current_pos, rgb_img) && is_color(current_pos, rgb_img, color) {
         result.push(Coordinates { ..*current_pos });
         match dp {
             Direction::RIGHT => current_pos.x += 1,
@@ -158,8 +154,8 @@ pub fn get_block(
     let mut not_counted: Vec<Coordinates> = Vec::new();
     not_counted.push(Coordinates { ..pos });
 
-    while not_counted.len() > 0 {
-        while in_range(&current_pos, &rgb_img) && is_color(&current_pos, &rgb_img, color) {
+    while !not_counted.is_empty() {
+        while in_range(&current_pos, rgb_img) && is_color(&current_pos, rgb_img, color) {
             if not_counted.contains(&current_pos) {
                 // remove from not_counted add to counted
                 remove_all::<Coordinates>(&mut not_counted, &current_pos);
@@ -169,7 +165,7 @@ pub fn get_block(
             check_adjacent_codels(
                 current_pos,
                 codel_size,
-                &rgb_img,
+                rgb_img,
                 &mut counted,
                 &mut not_counted,
                 color,
@@ -177,7 +173,7 @@ pub fn get_block(
 
             current_pos.x += codel_size;
         }
-        if not_counted.len() > 0 {
+        if !not_counted.is_empty() {
             current_pos = not_counted[0];
         } else {
             break;
@@ -200,13 +196,13 @@ pub fn next_color(
     let mut cc_toggled = false;
     let mut rotations = 0;
 
-    let mut block = get_block(&rgb_img, *pos, codel_size, *dp);
+    let mut block = get_block(rgb_img, *pos, codel_size, *dp);
     // loops until found next color-block
     loop {
-        match next_pos(&dp, &cc, &block, codel_size, &rgb_img) {
+        match next_pos(dp, cc, &block, codel_size, rgb_img) {
             Some(new_pos) => {
                 *pos = new_pos;
-                block = get_block(&rgb_img, *pos, codel_size, *dp);
+                block = get_block(rgb_img, *pos, codel_size, *dp);
                 return Some(ColorInfo {
                     color: rgb_img[pos.y as usize][pos.x as usize],
                     size: get_size(&block),

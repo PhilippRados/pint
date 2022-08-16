@@ -140,7 +140,7 @@ mod tests {
         let mut meta = IHDRData::default();
         meta.width = 150;
         meta.color_type = ColorType::TrueColorRGB;
-        let result = parse_data(idat, meta, None, RGBorU8::RGB(RGB(0, 0, 0)));
+        let result = parse_data(idat, meta, None, RGBorU8::Rgb(RGB(0, 0, 0)));
 
         // println!("{:?}",result);
 
