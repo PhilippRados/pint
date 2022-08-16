@@ -11,7 +11,7 @@ function assert_eq {
     exit 1
   fi
 
-  $(cargo r -q tests/fixtures/"$fixture" -c "$cs" >& tmp)
+  $(cargo r -q --release tests/fixtures/"$fixture" -c "$cs" >& tmp)
   result=$(diff tests/snapshots/"$snapshot" tmp 2> err)
   error=$(cat err)
 
@@ -32,3 +32,4 @@ assert_eq "success_fizzbuzz" "fizzbuzz.png" "1" "fizzbuzz"
 
 # indexed palette bit-depth 8
 assert_eq "success_indexed_hello_world" "artsy_hello_world.png" "5" "indexed_hello_world"
+assert_eq "success_bottles" "99bottles.png" "1" "99_bottles_indexed_switch"
