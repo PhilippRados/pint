@@ -3,9 +3,10 @@
 Piet is a programming language in which programs look like abstract paintings. The language is named after Piet Mondrian, who pioneered the field of geometric abstract art.
 
 <img width=200 align="left" src="./tests/fixtures/piet_hello_world.png">
-<h4 align="left">This is a piet program that prints "Hello World!"</h4>
+<h4 align="left"> 👈 This is a piet program that prints "Hello World!"</h4>
 
-## Installation
+<h3>Installation</h3>
+
 ```
 cargo install pint
 ```
